@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MechTechs Boilerplate Code Generator</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    body {
+      height: 100vh;
+      background: radial-gradient(circle at top, #0b1120, #020617 65%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #e5e7eb;
+      overflow: hidden;
+    }
+
+    .screen {
+      position: absolute;
+      width: 780px;
+      max-width: 95%;
+      background: #0f172a;
+      border-radius: 18px;
+      padding: 28px 32px 24px;
+      box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.9),
+        0 0 32px rgba(56, 189, 248, 0.28);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(24px);
+      transition: 0.35s ease;
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .step-id {
+      text-align: center;
+      font-size: 11px;
+      color: #64748b;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    .title {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 800;
+      background: linear-gradient(90deg, #38bdf8, #0ea5e9, #818cf8);
+      -webkit-background-clip: text;
+      color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 20px;
+    }
+
+    label {
+      font-size: 13px;
+      margin-bottom: 4px;
+      display: block;
+      font-weight: 600;
+    }
+
+    .row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .row .big {
+      flex: 2;
+    }
+
+    .row .small {
+      flex: 1;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 9px;
+      border: 1px solid #334155;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.6);
+    }
+
+    .btn-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 999px;
+      border: none;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      background: linear-gradient(90deg, #0ea5e9, #2563eb);
+      color: #f9fafb;
+      box-shadow: 0 0 18px rgba(37, 99, 235, 0.6);
+      transition: 0.18s ease;
+    }
+
+    button.secondary {
+      background: #1f2937;
+      box-shadow: none;
+      border: 1px solid #4b5563;
+    }
+
+    button.danger {
+      background: #7f1d1d;
+      box-shadow: none;
+      border: 1px solid #f97373;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    .block {
+      background: #0b162b;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+
+    .block-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e5e7eb;
+      text-transform: uppercase;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.6);
+      margin-bottom: 6px;
+    }
+
+    .tc-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .tc-line span {
+      font-size: 13px;
+      color: #cbd5f5;
+      min-width: 64px;
+    }
+
+    .tc-line input.tc-name {
+      flex: 1;
+      min-width: 220px;
+      margin-bottom: 0;
+    }
+
+    .tc-line input.tc-req {
+      width: 60px;
+      text-align: center;
+      margin-bottom: 0;
+    }
+
+    .req-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 4px 0;
+    }
+
+    .req-row label {
+      min-width: 90px;
+      margin-bottom: 0;
+      color: #cbd5f5;
+    }
+
+    .req-row select {
+      width: 260px;
+      margin-bottom: 0;
+    }
+
+    .req-row input.custom {
+      width: 240px;
+      display: none;
+      margin-bottom: 0;
+    }
+
+    .scroll {
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .footer-note {
+      position: fixed;
+      bottom: 6px;
+      right: 12px;
+      font-size: 11px;
+      color: #94a3b8;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+
+<!-- STEP 1 -->
+<div id="step1" class="screen active">
+  <div class="step-id">STEP 1 OF 4</div>
+  <div class="title">MechTechs Boilerplate Generator</div>
+  <div class="subtitle">Start with basic scenario details</div>
+
+  <div class="row">
+    <div class="big">
+      <label>Scenario Name *</label>
+      <input id="scenarioInput" placeholder="Test_Scenario">
+    </div>
+    <div class="small">
+      <label>Author *</label>
+      <input id="authorInput" placeholder="John Doe">
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button onclick="goToStep2()">Next ▷</button>
+  </div>
+</div>
+
+<!-- STEP 2 -->
+<div id="step2" class="screen">
+  <div class="step-id">STEP 2 OF 4</div>
+  <div class="title">Test Case Count</div>
+  <div class="subtitle">How many test cases belong to this scenario?</div>
+
+  <div style="max-width:260px;margin:auto;">
+    <label>Number of Test Cases *</label>
+    <input id="tcCountInput" type="number" min="1" placeholder="e.g. 3">
+  </div>
+
+  <div class="btn-row">
+    <button class="secondary" onclick="showStep('step1')">◁ Back</button>
+    <button onclick="buildTestCaseRows()">Next ▷</button>
+  </div>
+</div>
+
+<!-- STEP 3 -->
+<div id="step3" class="screen">
+  <div class="step-id">STEP 3 OF 4</div>
+  <div class="title">Define Test Cases</div>
+  <div class="subtitle">Name each test case and specify how many PreReqs it has</div>
+
+  <div id="tcRowsContainer" class="scroll"></div>
+
+  <div class="btn-row">
+    <button class="secondary" onclick="showStep('step2')">◁ Back</button>
+    <button onclick="goToStep4()">Next ▷</button>
+  </div>
+</div>
+
+<!-- STEP 4 -->
+<div id="step4" class="screen">
+  <div class="step-id">STEP 4 OF 4</div>
+  <div class="title">Assign Pre-Requisites</div>
+  <div class="subtitle">Per your sketch: compact layout, dropdown + inline custom field</div>
+
+  <div id="preReqContainer" class="scroll"></div>
+
+  <div class="block">
+    <div class="block-title">Test Script Application</div>
+    <div class="req-row">
+      <label>Tests App:</label>
+      <select id="testsAppSelect">
+        <option value="PowerChart">PowerChart</option>
+        <option value="Revenue Cycle">Revenue Cycle</option>
+        <option value="Database Update">Database Update</option>
+        <option value="Custom">Custom</option>
+      </select>
+      <input id="testsAppCustom" class="custom" placeholder="Custom Test Application">
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="danger" onclick="resetWizard()">⟳ New Scenario</button>
+    <button class="secondary" onclick="showStep('step3')">◁ Back</button>
+    <button onclick="generateZip()">Generate ZIP 🚀</button>
+  </div>
+</div>
+
+<div class="footer-note">Created by Akhilesh</div>
+
+<script>
+  // === GLOBAL STATE ===
+  let scenarioName = "";
+  let authorName   = "";
+  let tcCount      = 0;
+  let testCases    = []; // [{ name, preCount }]
+
+  function showStep(id) {
+    document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+  }
+
+  // STEP 1 -> STEP 2
+  function goToStep2() {
+    const sVal = document.getElementById("scenarioInput").value.trim();
+    const aVal = document.getElementById("authorInput").value.trim();
+
+    if (!sVal || !aVal) {
+      alert("Please enter Scenario Name and Author.");
+      return;
+    }
+
+    scenarioName = sVal;
+    authorName   = aVal;
+    showStep("step2");
+  }
+
+  // STEP 2 -> build STEP 3 rows
+  function buildTestCaseRows() {
+    const val = parseInt(document.getElementById("tcCountInput").value, 10);
+    if (!val || val <= 0) {
+      alert("Please enter a valid number of test cases.");
+      return;
+    }
+    tcCount = val;
+
+    const container = document.getElementById("tcRowsContainer");
+    container.innerHTML = "";
+
+    for (let i = 0; i < tcCount; i++) {
+      const idx = i + 1;
+
+      const block = document.createElement("div");
+      block.className = "block";
+
+      const title = document.createElement("div");
+      title.className = "block-title";
+      title.textContent = `TEST_CASE_${idx}`;
+      block.appendChild(title);
+
+      const row = document.createElement("div");
+      row.className = "tc-line";
+
+      const lblName = document.createElement("span");
+      lblName.textContent = "Name:";
+      row.appendChild(lblName);
+
+      const nameInput = document.createElement("input");
+      nameInput.id = `tcName_${i}`;
+      nameInput.className = "tc-name";
+      nameInput.placeholder = `Test_Case_${idx}`;
+      row.appendChild(nameInput);
+
+      const lblReq = document.createElement("span");
+      lblReq.textContent = "PreReqs:";
+      row.appendChild(lblReq);
+
+      const reqInput = document.createElement("input");
+      reqInput.id = `tcPreCount_${i}`;
+      reqInput.className = "tc-req";
+      reqInput.type = "text";
+      reqInput.value = "1";
+      reqInput.oninput = function () {
+        this.value = this.value.replace(/[^0-9]/g, "");
+      };
+      row.appendChild(reqInput);
+
+      block.appendChild(row);
+      container.appendChild(block);
+    }
+
+    showStep("step3");
+  }
+
+  // STEP 3 -> STEP 4
+  function goToStep4() {
+    const list = [];
+    for (let i = 0; i < tcCount; i++) {
+      const nameEl = document.getElementById(`tcName_${i}`);
+      const reqEl  = document.getElementById(`tcPreCount_${i}`);
+
+      const nameVal = nameEl.value.trim() || `Test_Case_${i + 1}`;
+      let preCount  = parseInt(reqEl.value, 10);
+      if (!preCount || preCount < 1) preCount = 1;
+
+      list.push({ name: nameVal, preCount: preCount });
+    }
+    testCases = list;
+
+    buildPreReqUI();
+    showStep("step4");
+  }
+
+  function buildPreReqUI() {
+    const container = document.getElementById("preReqContainer");
+    container.innerHTML = "";
+
+    testCases.forEach((tc, tcIndex) => {
+      const block = document.createElement("div");
+      block.className = "block";
+
+      const title = document.createElement("div");
+      title.className = "block-title";
+      title.textContent = tc.name;
+      block.appendChild(title);
+
+      for (let p = 0; p < tc.preCount; p++) {
+        const row = document.createElement("div");
+        row.className = "req-row";
+
+        const label = document.createElement("label");
+        label.textContent = tc.preCount > 1 ? `PreReq ${p + 1}:` : "PreReq:";
+        row.appendChild(label);
+
+        const select = document.createElement("select");
+        const selId = `preAppSel_${tcIndex}_${p}`;
+        select.id = selId;
+        select.innerHTML = `
+          <option value="PowerChart">PowerChart</option>
+          <option value="Revenue Cycle">Revenue Cycle</option>
+          <option value="Database Update">Database Update</option>
+          <option value="Custom">Custom</option>
+        `;
+        row.appendChild(select);
+
+        const input = document.createElement("input");
+        const inpId = `preAppCustom_${tcIndex}_${p}`;
+        input.id = inpId;
+        input.className = "custom";
+        input.placeholder = "Custom Application";
+        row.appendChild(input);
+
+        select.addEventListener("change", () => {
+          if (select.value === "Custom") {
+            input.style.display = "block";
+            input.focus();
+          } else {
+            input.style.display = "none";
+          }
+        });
+
+        block.appendChild(row);
+      }
+
+      container.appendChild(block);
+    });
+
+    const testsAppSelect = document.getElementById("testsAppSelect");
+    const testsAppCustom = document.getElementById("testsAppCustom");
+
+    testsAppSelect.onchange = () => {
+      if (testsAppSelect.value === "Custom") {
+        testsAppCustom.style.display = "block";
+        testsAppCustom.focus();
+      } else {
+        testsAppCustom.style.display = "none";
+      }
+    };
+  }
+
+  function getTestsApplication() {
+    const sel = document.getElementById("testsAppSelect");
+    const custom = document.getElementById("testsAppCustom");
+    if (sel.value === "Custom") {
+      return custom.value.trim() || "CustomApp";
+    }
+    return sel.value;
+  }
+
+  // === Script builders ===
+  function buildPreReqScript(tcName, preIndex, preCount, maxPre, app) {
+    let workflowLabel;
+    if (maxPre === 1) {
+      workflowLabel = `PreReq_${scenarioName}`;
+    } else {
+      const level = (preCount > 1) ? (preIndex + 1) : 1;
+      workflowLabel = `PreReq_${scenarioName}_${level}`;
+    }
+
+    const suffix  = (preCount > 1) ? `_${preIndex + 1}` : "";
+    const full    = `PreReq_${tcName}${suffix}`;
+
+    return (
+`#Author: ${authorName}
+#Application: ${app}
+#Workflow: ${workflowLabel}
+#Test Case Name: ${full}
+
+(*Prerequisites
+*)
+
+Params 
+
+BeginTestCase "${full}"
+Try
+	
+Catch
+	LogError "Test Case: ${full} has failed" && The Exception
+	CaptureScreen "${full}_Failure"
+	Put The Result
+End Try
+EndTestCase "${full}"`
+    );
+  }
+
+  function buildPreReqWorkflow(levelIndex, maxPre) {
+    const level = levelIndex + 1;
+    let wfName;
+    if (maxPre === 1) {
+      wfName = `PreReq_${scenarioName}`;
+    } else {
+      wfName = `PreReq_${scenarioName}_${level}`;
+    }
+
+    let content =
+`Global TestDataConnection
+Set ScenarioRows = the records of TestDataConnection where Scenario is "${scenarioName}"
+
+Repeat With Each Scenario in ScenarioRows By Reference
+`;
+
+    testCases.forEach(tc => {
+      if (tc.preCount >= level) {
+        const suffix = (tc.preCount > 1) ? `_${level}` : "";
+        content +=
+`If Trim(Scenario.TestCase) is "TCP1_${tc.name}" Then
+	Set ReturnData = "PreRequisites/PreReq_${tc.name}${suffix}"(Scenario.PatientMRN)
+End If
+
+`;
+      }
+    });
+
+    content += "End Repeat";
+    return { wfName, content };
+  }
+
+  function buildMainWorkflow() {
+    return (
+`Global TestDataConnection
+Set TestDataRows = the records of TestDataConnection where Scenario is "${scenarioName}"
+
+Repeat With Each TestData in TestDataRows By Reference
+${testCases.map(tc =>
+`If Trim(TestData.TestCase) is "TCP1_${tc.name}" Then 
+	RunWithNewResults "Tests/TCP1_${tc.name}", TestData.PatientMRN
+End If`).join("\n")}
+End Repeat`
+    );
+  }
+
+  function buildTestScript(tcName, app) {
+    return (
+`#Author: ${authorName}
+#Application: ${app}
+#Workflow: ${scenarioName}
+#Test Case Name: TCP1_${tcName}
+#TestRail Link: 
+
+(*Prerequisites
+
+*)
+
+Params 
+BeginTestCase "TCP1_${tcName}"
+Try
+Catch
+	LogError "TCP1_${tcName} has failed" && The Exception
+	CaptureScreen "TCP1_${tcName}_Failure"
+	Put The Result
+	Logout.Close_PatientChart
+End Try
+EndTestCase "TCP1_${tcName}"`
+    );
+  }
+
+  // === ZIP GENERATION ===
+  function generateZip() {
+    if (!scenarioName || !authorName || !testCases.length) {
+      alert("Please complete all steps before generating.");
+      return;
+    }
+
+    const maxPre = Math.max(...testCases.map(tc => tc.preCount));
+    const testsApp = getTestsApplication();
+
+    const zip       = new JSZip();
+    const preFolder = zip.folder("PreRequisites");
+    const preWFFldr = zip.folder("PreReq_Workflow");
+    const testsFldr = zip.folder("Tests");
+    const wfFolder  = zip.folder("Workflow");
+
+    // PreReq scripts
+    testCases.forEach((tc, tcIndex) => {
+      for (let p = 0; p < tc.preCount; p++) {
+        const sel = document.getElementById(`preAppSel_${tcIndex}_${p}`);
+        const inp = document.getElementById(`preAppCustom_${tcIndex}_${p}`);
+        let app;
+        if (sel.value === "Custom") {
+          app = (inp.value.trim() || "CustomApp");
+        } else {
+          app = sel.value;
+        }
+
+        const script = buildPreReqScript(tc.name, p, tc.preCount, maxPre, app);
+        const suffix = (tc.preCount > 1) ? `_${p + 1}` : "";
+        const fileName = `PreReq_${tc.name}${suffix}.script`;
+        preFolder.file(fileName, script);
+      }
+    });
+
+    // PreReq Workflow scripts
+    for (let levelIndex = 0; levelIndex < maxPre; levelIndex++) {
+      const wfObj = buildPreReqWorkflow(levelIndex, maxPre);
+      preWFFldr.file(wfObj.wfName + ".script", wfObj.content);
+    }
+
+    // Main workflow
+    wfFolder.file(scenarioName + ".script", buildMainWorkflow());
+
+    // Test scripts
+    testCases.forEach(tc => {
+      const content = buildTestScript(tc.name, testsApp);
+      testsFldr.file(`TCP1_${tc.name}.script`, content);
+    });
+
+    zip.generateAsync({ type: "blob" }).then(blob => {
+      const zipName = scenarioName + ".zip";
+      saveAs(blob, zipName);
+      alert(`ZIP generated and downloaded as "${zipName}".`);
+    });
+  }
+
+  function resetWizard() {
+    window.location.reload();
+  }
+</script>
+
+</body>
+</html>

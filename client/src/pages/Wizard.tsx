@@ -1,0 +1,144 @@
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { generateZip, TestCase } from "@/lib/generator";
+import Step1 from "@/components/steps/Step1";
+import Step2 from "@/components/steps/Step2";
+import Step3 from "@/components/steps/Step3";
+import Step4 from "@/components/steps/Step4";
+import { useToast } from "@/hooks/use-toast";
+
+export default function Wizard() {
+  const { toast } = useToast();
+  const [step, setStep] = useState(1);
+  
+  // Data State
+  const [scenarioName, setScenarioName] = useState("");
+  const [author, setAuthor] = useState("");
+  const [tcCount, setTcCount] = useState(0);
+  const [testCases, setTestCases] = useState<TestCase[]>([]);
+  const [testsApp, setTestsApp] = useState("PowerChart");
+  const [testsAppCustom, setTestsAppCustom] = useState("");
+
+  const nextStep = () => setStep((s) => Math.min(s + 1, 4));
+  const prevStep = () => setStep((s) => Math.max(s - 1, 1));
+
+  const handleTcCountUpdate = (count: number) => {
+    setTcCount(count);
+    // Initialize or resize testCases array
+    const newCases: TestCase[] = Array.from({ length: count }, (_, i) => {
+      // Preserve existing data if available
+      if (testCases[i]) return testCases[i];
+      
+      return {
+        id: crypto.randomUUID(),
+        name: `Test_Case_${i + 1}`,
+        preReqCount: 1,
+        preReqs: [{ app: "PowerChart" }]
+      };
+    });
+    setTestCases(newCases);
+  };
+
+  const handleReset = () => {
+    if (confirm("Are you sure you want to reset everything?")) {
+      setStep(1);
+      setScenarioName("");
+      setAuthor("");
+      setTcCount(0);
+      setTestCases([]);
+      setTestsApp("PowerChart");
+      setTestsAppCustom("");
+    }
+  };
+
+  const handleGenerate = async () => {
+    try {
+      await generateZip({
+        scenarioName,
+        author,
+        testCases,
+        testsApp,
+        testsAppCustom
+      });
+      toast({
+        title: "Success!",
+        description: "Your boilerplate ZIP has been generated.",
+        className: "bg-green-500/10 border-green-500/20 text-green-200"
+      });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: "Error",
+        description: "Failed to generate ZIP file.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Ambience */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 w-full flex justify-center">
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div key="step1" className="w-full flex justify-center">
+              <Step1 
+                scenarioName={scenarioName} 
+                author={author} 
+                onUpdate={(d) => { setScenarioName(d.scenarioName); setAuthor(d.author); }}
+                onNext={nextStep} 
+              />
+            </motion.div>
+          )}
+          {step === 2 && (
+            <motion.div key="step2" className="w-full flex justify-center">
+              <Step2 
+                count={tcCount} 
+                onUpdate={handleTcCountUpdate}
+                onNext={nextStep}
+                onBack={prevStep}
+              />
+            </motion.div>
+          )}
+          {step === 3 && (
+            <motion.div key="step3" className="w-full flex justify-center">
+              <Step3 
+                testCases={testCases} 
+                onUpdate={setTestCases}
+                onNext={nextStep}
+                onBack={prevStep}
+              />
+            </motion.div>
+          )}
+          {step === 4 && (
+            <motion.div key="step4" className="w-full flex justify-center">
+              <Step4 
+                testCases={testCases} 
+                testsApp={testsApp}
+                testsAppCustom={testsAppCustom}
+                onUpdateTestCase={(idx, rIdx, field, val) => {
+                  const newCases = [...testCases];
+                  if (field === 'app') newCases[idx].preReqs[rIdx].app = val;
+                  if (field === 'custom') newCases[idx].preReqs[rIdx].custom = val;
+                  setTestCases(newCases);
+                }}
+                onUpdateApp={(app, custom) => {
+                  setTestsApp(app);
+                  if (custom !== undefined) setTestsAppCustom(custom);
+                }}
+                onGenerate={handleGenerate}
+                onReset={handleReset}
+                onBack={prevStep}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,230 @@
+<!-- Created by Akhilesh on Sep-2025. Reach out to akhilesh.malepati@davita.com for any queries or updates -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patient Creation Data Generator</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    :root{--bg:#0f172a;--panel:#111827;--muted:#1f2937;--text:#e5e7eb;--accent:#22c55e;--accent2:#60a5fa;--err:#f87171}
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    body{margin:0;background:linear-gradient(120deg,#0f172a,#111827);color:var(--text);min-height:100vh;position:relative}
+    .wrap{max-width:1100px;margin:40px auto;padding:24px}
+    .card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.35)}
+    .header{padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.08)}
+    h1{margin:0;font-size:24px;letter-spacing:.2px}
+    .sub{opacity:.85;margin-top:6px;font-size:14px}
+    .body{padding:20px 24px}
+    .grid-head{display:grid;grid-template-columns:1fr 140px 110px;gap:12px;opacity:.75;margin-bottom:8px;font-size:12px}
+    .row{display:grid;grid-template-columns:1fr 140px 110px;gap:12px;align-items:center;margin-bottom:10px}
+    .row input{width:100%;padding:10px 12px;border-radius:10px;background:var(--panel);border:1px solid rgba(255,255,255,.12);color:var(--text)}
+    .row input:focus{outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(96,165,250,.25)}
+    .row .rm{background:#1f2937;border:1px solid rgba(255,255,255,.1);color:#e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer}
+    .row .rm:hover{background:#374151}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    button{cursor:pointer;border:none;border-radius:12px;padding:12px 16px;font-weight:600}
+    .add{background:var(--muted);color:var(--text);border:1px solid rgba(255,255,255,.12)}
+    .gen{background:var(--accent);color:#052e16}
+    .filename{margin-left:auto}
+    .err{color:var(--err);font-size:13px;margin-top:8px}
+    .credit{position:fixed;right:10px;bottom:6px;font-size:10px;opacity:.5}
+    @media (max-width:800px){.grid-head,.row{grid-template-columns:1fr 110px 90px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <h1>Patient Test Data Generator</h1>
+        <div class="sub">
+          <p>
+            This tool automates <b>Patient Test Data Generation</b> for QA and automation scripts. It creates
+            randomized and structured data sets with all required fields such as <b>Patient Name, Gender, DOB,
+            Address, and Encounter details</b>.
+          </p>
+          <p>
+            <b>Note:</b> The following columns need to be <u>manually entered or updated</u> in the generated Excel
+            file before it is used: <b>Scenario</b>, <b>TestCase</b>, <b>HealthPlan</b>, and <b>Secondary Personnel</b>.
+          </p>
+          <p>
+            Once these columns are updated, the Excel can be directly fed into the <b>AppHandlers.suite</b> in <b>Resources</b> folder.
+          </p>
+        </div>
+      </div>
+      <div class="body">
+        <div class="grid-head"><div>Starting Patient Name (e.g., EPRNAAAA)</div><div>No. of Patients</div><div>Action</div></div>
+        <div id="rows"></div>
+        <div class="controls">
+          <button class="add" id="addRowBtn">+ Add another batch</button>
+          <input id="fileName" class="filename" placeholder="File name (optional) e.g. Patients_Run_12" />
+          <button class="gen" id="generateBtn">Generate & Download Excel</button>
+        </div>
+        <div id="errorBox" class="err" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="credit">
+    <a href="mailto:akhilesh.malepati@davita.com" style="color:inherit;text-decoration:none;">Created by Akhilesh</a>
+  </div>
+
+  <script>
+    let ADDRESS_DATA_LEN = 0;
+    function ensureAddressData(){
+      if(typeof ADDRESS_DATA === 'undefined' || !Array.isArray(ADDRESS_DATA) || ADDRESS_DATA.length===0){
+        throw new Error('Embedded address data not found. Place addresses_embedded.js next to this HTML.');
+      }
+      ADDRESS_DATA_LEN = ADDRESS_DATA.length;
+    }
+  </script>
+  <script src="addresses_embedded.js"></script>
+
+  <script>
+    const LETTERS = "ABCDEFGHJKLMNOPQRSTUVWXYZ"; 
+    const L2I = Object.fromEntries([...LETTERS].map((c, i) => [c, i]));
+
+    function isValidStartName(name){
+      if(!name || name.length < 5) return false;
+      const suffix = name.slice(-4);
+      return /^[A-Z]{4}$/.test(suffix) && [...suffix].every(ch => ch in L2I);
+    }
+    function splitPrefix(name){ return { prefix: name.slice(0, -4), counter: name.slice(-4) }; }
+    function decodeCounter(s){ let v=0; for(const ch of s){ v=v*25+L2I[ch]; } return v; }
+    function encodeCounter(n){ let out=Array(4).fill('A'); for(let i=3;i>=0;i--){ out[i]=LETTERS[n%25]; n=Math.floor(n/25);} return n>0?null:out.join(''); }
+
+    function generateNames(startName, count){
+      startName = startName.toUpperCase().trim();
+      if(!isValidStartName(startName)) throw new Error("Invalid start name: "+startName+". Must end with 4 letters A–Z excluding 'I'.");
+      if(!(count>0)) throw new Error("Count must be positive for "+startName);
+      const {prefix, counter} = splitPrefix(startName);
+      const base = decodeCounter(counter);
+      const list = [];
+      for(let i=0;i<count;i++){
+        const enc = encodeCounter(base+i);
+        if(enc===null) throw new Error("Sequence overflow after "+i+" names for start "+startName);
+        const full = prefix+enc;
+        list.push({ index:i+1, last:full, first:enc });
+      }
+      return list;
+    }
+
+    function showError(msg){
+      const box = document.getElementById('errorBox');
+      box.textContent = msg; box.style.display = 'block';
+      setTimeout(()=> box.style.display='none', 6000);
+    }
+
+    function pickRandomAddress(){
+      const idx = Math.floor(Math.random()*ADDRESS_DATA.length);
+      const a = ADDRESS_DATA[idx];
+      return { Address: String(a.Address||''), City: String(a.City||''), State: String(a.State||'').toUpperCase(), Zip: String(a.Zip||'') };
+    }
+    function randomGender(){ return Math.random() < 0.5 ? 'Male' : 'Female'; }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function randomDOBBefore2000(){
+      const start = new Date(1950,0,1).getTime();
+      const end = new Date(1999,11,31).getTime();
+      const t = start + Math.floor(Math.random()*(end-start+1));
+      const d = new Date(t);
+      return `${pad2(d.getMonth()+1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
+    }
+    function timestamp(){
+      const d = new Date(); const z = n => String(n).padStart(2,'0');
+      return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
+    }
+
+    async function buildAndDownloadExcelJS(data){
+      const header = [
+        "Index","Scenario","TestCase","LastName","FirstName","PatientMRN","HealthPlan","Address","City","Zip","State","Gender","DOB",
+        "RCEncounterLocation","RCEncounter","Encounter1","Encounter2","SecondaryPersonnel","PersonID","ReferralSource1","ReferralSource2","ReferralReason1","ReferralReason2","RCEncounterAdded","Encounter1Added","Encounter2Added","HP1Added","HP2Added","Unassigned"
+      ];
+
+      const rows = data.map(r => [
+        r.index, "", "", r.last, r.first, "","", r.addr.Address, r.addr.City, String(r.addr.Zip||'').padStart(5,'0'),
+        r.addr.State, r.gender, r.dob,
+        "ED","Historical","CKCC - ESKD","TOC - ESKD","","","Care Manager","Care Manager","Care coordination","Care coordination","","","","","", ""
+      ]);
+
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Patients', { views: [{ state: 'frozen', ySplit: 1 }] });
+
+      ws.addRow(header);
+      ws.addRows(rows);
+
+      const headerRow = ws.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      headerRow.height = 20;
+      headerRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+      });
+
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: header.length } };
+
+      const MIN = { 4:10, 8:24, 9:14, 10:8, 11:8, 12:8, 13:12 };
+      const padding = 2;
+      header.forEach((h, i) => {
+        const colIndex = i + 1;
+        let maxLen = String(h).length;
+        for (let r = 2; r <= ws.rowCount; r++) {
+          const val = ws.getRow(r).getCell(colIndex).value;
+          const len = val ? String(val).length : 0;
+          if (len > maxLen) maxLen = len;
+        }
+        ws.getColumn(colIndex).width = Math.max(maxLen + padding, MIN[colIndex] || 6);
+      });
+
+      const base = document.getElementById('fileName').value.trim();
+      const fname = (base ? base : `Patients_${timestamp()}`) + '.xlsx';
+      const blob = await wb.xlsx.writeBuffer();
+      saveAs(new Blob([blob], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), fname);
+    }
+
+    function generateAndDownload(){
+      try{
+        ensureAddressData();
+        const batches = [...document.querySelectorAll('#rows .row')].map(r=>({
+          start: r.querySelector('.start').value.trim().toUpperCase(),
+          cnt: parseInt(r.querySelector('.count').value,10)
+        }));
+        if(batches.length===0){ showError('Add at least one batch.'); return; }
+
+        let all = [];
+        for(const b of batches){
+          const names = generateNames(b.start, b.cnt);
+          names.forEach(n => {
+            const a = pickRandomAddress();
+            n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip||'').padStart(5,'0') };
+            n.gender = randomGender();
+            n.dob = randomDOBBefore2000();
+            all.push(n);
+          });
+        }
+
+        buildAndDownloadExcelJS(all);
+      }catch(err){ console.error(err); showError(err.message||String(err)); }
+    }
+
+    function addRow(start="EPRNAAAA", num=10){
+      const rows = document.getElementById('rows');
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <input type="text" class="start" value="${start}" maxlength="40" placeholder="e.g., EPRNAAAA"/>
+        <input type="number" class="count" value="${num}" min="1" step="1"/>
+        <button class="rm" title="Remove this batch">Remove</button>
+      `;
+      row.querySelector('.rm').addEventListener('click', ()=>{ if(document.querySelectorAll('#rows .row').length>1){ row.remove(); } });
+      rows.appendChild(row);
+    }
+
+    document.getElementById('addRowBtn').addEventListener('click', ()=> addRow('', 1));
+    document.getElementById('generateBtn').addEventListener('click', generateAndDownload);
+    addRow('EPRNAAAA', 10);
+  </script>
+</body>
+</html>
