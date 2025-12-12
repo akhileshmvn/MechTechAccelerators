@@ -12,13 +12,25 @@ import { useLocation } from "wouter";
 export default function PatientGenerator() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [batches, setBatches] = useState<Batch[]>([
-    { id: "1", startName: "EPRNAAAA", count: 10 }
+  const createBatchId = () => {
+    // Some hosting setups (e.g. non-HTTPS S3 websites) block crypto.randomUUID
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      try {
+        return crypto.randomUUID();
+      } catch (err) {
+        console.warn("randomUUID unavailable", err);
+      }
+    }
+    return `batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  };
+
+  const [batches, setBatches] = useState<Batch[]>(() => [
+    { id: createBatchId(), startName: "EPRNAAAA", count: 10 }
   ]);
   const [fileName, setFileName] = useState("");
 
   const addBatch = () => {
-    setBatches([...batches, { id: crypto.randomUUID(), startName: "", count: 10 }]);
+    setBatches([...batches, { id: createBatchId(), startName: "", count: 10 }]);
   };
 
   const removeBatch = (id: string) => {
