@@ -7,8 +7,20 @@ import Step3 from "@/components/steps/Step3";
 import Step4 from "@/components/steps/Step4";
 import { useToast } from "@/hooks/use-toast";
 
+const createTestCaseId = () => {
+  // randomUUID is only available in secure contexts; fall back for static http hosting
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch (err) {
+      console.warn("randomUUID unavailable", err);
+    }
+  }
+  return `tc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+};
+
 const createTestCase = (index: number): TestCase => ({
-  id: crypto.randomUUID(),
+  id: createTestCaseId(),
   name: `Test_Case_${index + 1}`,
   preReqCount: 1,
   preReqs: [{ app: "PowerChart" }]
