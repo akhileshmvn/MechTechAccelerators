@@ -7,6 +7,13 @@ import Step3 from "@/components/steps/Step3";
 import Step4 from "@/components/steps/Step4";
 import { useToast } from "@/hooks/use-toast";
 
+const createTestCase = (index: number): TestCase => ({
+  id: crypto.randomUUID(),
+  name: `Test_Case_${index + 1}`,
+  preReqCount: 1,
+  preReqs: [{ app: "PowerChart" }]
+});
+
 export default function Wizard() {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
@@ -14,8 +21,8 @@ export default function Wizard() {
   // Data State
   const [scenarioName, setScenarioName] = useState("");
   const [author, setAuthor] = useState("");
-  const [tcCount, setTcCount] = useState(0);
-  const [testCases, setTestCases] = useState<TestCase[]>([]);
+  const [tcCount, setTcCount] = useState(1);
+  const [testCases, setTestCases] = useState<TestCase[]>(() => [createTestCase(0)]);
   const [testsApp, setTestsApp] = useState("PowerChart");
   const [testsAppCustom, setTestsAppCustom] = useState("");
 
@@ -23,18 +30,14 @@ export default function Wizard() {
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
   const handleTcCountUpdate = (count: number) => {
-    setTcCount(count);
+    const safeCount = Math.max(1, count);
+    setTcCount(safeCount);
     // Initialize or resize testCases array
-    const newCases: TestCase[] = Array.from({ length: count }, (_, i) => {
+    const newCases: TestCase[] = Array.from({ length: safeCount }, (_, i) => {
       // Preserve existing data if available
       if (testCases[i]) return testCases[i];
       
-      return {
-        id: crypto.randomUUID(),
-        name: `Test_Case_${i + 1}`,
-        preReqCount: 1,
-        preReqs: [{ app: "PowerChart" }]
-      };
+      return createTestCase(i);
     });
     setTestCases(newCases);
   };
@@ -44,8 +47,8 @@ export default function Wizard() {
       setStep(1);
       setScenarioName("");
       setAuthor("");
-      setTcCount(0);
-      setTestCases([]);
+      setTcCount(1);
+      setTestCases([createTestCase(0)]);
       setTestsApp("PowerChart");
       setTestsAppCustom("");
     }
