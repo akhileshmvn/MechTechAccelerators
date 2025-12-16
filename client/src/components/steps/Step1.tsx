@@ -20,7 +20,7 @@ export default function Step1({ scenarioName, author, onUpdate, onNext }: Step1P
     <GlassCard className="w-full max-w-lg">
       <WizardHeader 
         step={1} 
-        title="MechTechs Boiler Plate Files Generator" 
+        title="MechTechs Boilerplate Files Generator" 
         subtitle="Start by defining your scenario details" 
       />
 
