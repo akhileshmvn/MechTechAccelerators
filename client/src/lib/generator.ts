@@ -78,7 +78,7 @@ Params
 
 BeginTestCase "${fullName}"
 Try
-	
+	//Add Code Here
 Catch
 	LogError "Test Case: ${fullName} has failed" && The Exception
 	CaptureScreen "${fullName}_Failure"
@@ -146,11 +146,11 @@ const buildTestScript = (tcName: string, scenario: string, author: string, app: 
 Params 
 BeginTestCase "TCP1_${tcName}"
 Try
+	//Add Code Here
 Catch
 	LogError "TCP1_${tcName} has failed" && The Exception
 	CaptureScreen "TCP1_${tcName}_Failure"
 	Put The Result
-	Logout.Close_PatientChart
 End Try
 EndTestCase "TCP1_${tcName}"`;
 
