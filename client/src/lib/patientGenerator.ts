@@ -1,33 +1,60 @@
-// Source data from the provided addresses_embedded.js file
-// In a real app, this could be imported from a JSON file, but for the mockup, we'll inline a subset
-// and provide the full list logic.
-const ADDRESS_DATA = [
-  {"Address":"71 ST. NICHOLAS DRIVE","City":"NORTH POLE","State":"AK","Zip":"99705"},
-  {"Address":"356 OLD STEESE HWY","City":"FAIRBANKS","State":"AK","Zip":"99701"},
-  {"Address":"3576 AIRPORT WAY","City":"FAIRBANKS","State":"AK","Zip":"99709"},
-  {"Address":"9400 GLACIER HWY","City":"JUNEAU","State":"AK","Zip":"99803"},
-  {"Address":"201 KATLIAN ST","City":"SITKA","State":"AK","Zip":"99835"},
-  {"Address":"2417 TONGASS AVE","City":"KETCHIKAN","State":"AK","Zip":"99901"},
-  {"Address":"402 W. MARINE WAY","City":"KODIAK","State":"AK","Zip":"99615"},
-  {"Address":"3726 LAKE STREET","City":"HOMER","State":"AK","Zip":"99603"},
-  {"Address":"35553 KENAI SPUR HIGHWAY","City":"SOLDOTNA","State":"AK","Zip":"99669"},
-  {"Address":"10672 KENAI SPUR HIGHWAY","City":"KENAI","State":"AK","Zip":"99611"},
-  {"Address":"1830 E. PARKS HWY","City":"WASILLA","State":"AK","Zip":"99654"},
-  {"Address":"4711 BUSINESS PARK BLVD","City":"ANCHORAGE","State":"AK","Zip":"99503"},
-  {"Address":"320 W 5TH AVENUE","City":"ANCHORAGE","State":"AK","Zip":"99501"},
-  {"Address":"1865 E PARKS HWY","City":"WASILLA","State":"AK","Zip":"99654"},
-  {"Address":"320 WEST 5TH AVE","City":"ANCHORAGE","State":"AK","Zip":"99501"},
-  {"Address":"600 E. NORTHERN LIGHTS BLVD. #E","City":"ANCHORAGE","State":"AK","Zip":"99503"},
-  {"Address":"11432 BUSINESS BLVD","City":"EAGLE RIVER","State":"AK","Zip":"99577"},
-  {"Address":"800 E DIMOND BLVD","City":"ANCHORAGE","State":"AK","Zip":"99515"},
-  {"Address":"1118 N MULDOON ROAD","City":"ANCHORAGE","State":"AK","Zip":"99504"}
-];
-
 import ExcelJS from 'exceljs';
 import { saveFile } from './file-utils';
+import { loadAddresses, AddressRecord } from '@/lib/addressData';
 
 const LETTERS = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
 const L2I = Object.fromEntries([...LETTERS].map((c, i) => [c, i]));
+
+const FULL_HEADER = [
+  "Index",
+  "Scenario",
+  "TestCase",
+  "LastName",
+  "FirstName",
+  "PatientMRN",
+  "HealthPlan",
+  "Address",
+  "City",
+  "Zip",
+  "State",
+  "Gender",
+  "DOB",
+  "RCEncounterLocation",
+  "RCEncounter",
+  "Encounter1",
+  "Encounter2",
+  "SecondaryPersonnel",
+  "PersonID",
+  "ReferralSource1",
+  "ReferralSource2",
+  "ReferralReason1",
+  "ReferralReason2",
+  "RCEncounterAdded",
+  "Encounter1Added",
+  "Encounter2Added",
+  "HP1Added",
+  "HP2Added",
+  "Unassigned"
+];
+
+const PATIENT_ONLY_HEADER = [
+  "Index",
+  "Scenario",
+  "TestCase",
+  "LastName",
+  "FirstName",
+  "PatientMRN",
+  "HealthPlan",
+  "Address",
+  "City",
+  "Zip",
+  "State",
+  "Gender",
+  "DOB",
+  "RCEncounterLocation",
+  "RCEncounter",
+  "RCEncounterAdded"
+];
 
 function isValidStartName(name: string) {
   if (!name || name.length < 5) return false;
@@ -74,14 +101,17 @@ function generateNames(startName: string, count: number) {
   return list;
 }
 
-function pickRandomAddress() {
-  const idx = Math.floor(Math.random() * ADDRESS_DATA.length);
-  const a = ADDRESS_DATA[idx];
-  return { 
-    Address: String(a.Address || ''), 
-    City: String(a.City || ''), 
-    State: String(a.State || '').toUpperCase(), 
-    Zip: String(a.Zip || '') 
+function pickRandomAddress(pool: AddressRecord[]) {
+  if (!pool.length) {
+    return { Address: '', City: '', State: '', Zip: '' };
+  }
+  const idx = Math.floor(Math.random() * pool.length);
+  const a = pool[idx];
+  return {
+    Address: String(a.Address || ''),
+    City: String(a.City || ''),
+    State: String(a.State || '').toUpperCase(),
+    Zip: String(a.Zip || '')
   };
 }
 
@@ -113,13 +143,22 @@ export interface Batch {
   count: number;
 }
 
-export async function generatePatientData(batches: Batch[], fileName?: string) {
+export interface PatientGenerationOptions {
+  includeRCEncounters?: boolean;
+}
+
+export async function generatePatientData(
+  batches: Batch[],
+  fileName?: string,
+  options: PatientGenerationOptions = {}
+) {
   let all: any[] = [];
+  const addressPool = await loadAddresses();
   
   for (const b of batches) {
     const names = generateNames(b.startName, b.count);
     names.forEach((n: any) => {
-      const a = pickRandomAddress();
+      const a = pickRandomAddress(addressPool);
       n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };
       n.gender = randomGender();
       n.dob = randomDOBBefore2000();
@@ -127,16 +166,51 @@ export async function generatePatientData(batches: Batch[], fileName?: string) {
     });
   }
 
-  const header = [
-    "Index", "Scenario", "TestCase", "LastName", "FirstName", "PatientMRN", "HealthPlan", "Address", "City", "Zip", "State", "Gender", "DOB",
-    "RCEncounterLocation", "RCEncounter", "Encounter1", "Encounter2", "SecondaryPersonnel", "PersonID", "ReferralSource1", "ReferralSource2", "ReferralReason1", "ReferralReason2", "RCEncounterAdded", "Encounter1Added", "Encounter2Added", "HP1Added", "HP2Added", "Unassigned"
-  ];
+  const includeRCEncounters = options.includeRCEncounters !== false;
+  const header = includeRCEncounters ? FULL_HEADER : PATIENT_ONLY_HEADER;
+  const rcEncounterValue = includeRCEncounters ? "Historical" : "CKCC-ESKD";
 
-  const rows = all.map(r => [
-    r.index, "", "", r.last, r.first, "", "", r.addr.Address, r.addr.City, String(r.addr.Zip || '').padStart(5, '0'),
-    r.addr.State, r.gender, r.dob,
-    "ED", "Historical", "CKCC - ESKD", "TOC - ESKD", "", "", "Care Manager", "Care Manager", "Care coordination", "Care coordination", "", "", "", "", "", ""
-  ]);
+  const rows = all.map((r) => {
+    const base = [
+      r.index,
+      "",
+      "",
+      r.last,
+      r.first,
+      "",
+      "",
+      r.addr.Address,
+      r.addr.City,
+      String(r.addr.Zip || '').padStart(5, '0'),
+      r.addr.State,
+      r.gender,
+      r.dob
+    ];
+
+    if (includeRCEncounters) {
+      return [
+        ...base,
+        "ED",
+        rcEncounterValue,
+        "CKCC - ESKD",
+        "TOC - ESKD",
+        "",
+        "",
+        "Care Manager",
+        "Care Manager",
+        "Care coordination",
+        "Care coordination",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ];
+    }
+
+    return [...base, "ED", rcEncounterValue, ""];
+  });
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Patients', { views: [{ state: 'frozen', ySplit: 1 }] });

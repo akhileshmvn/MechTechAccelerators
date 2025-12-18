@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
+import { Switch } from "@/components/ui/switch";
 
 export default function PatientGenerator() {
   const { toast } = useToast();
@@ -28,6 +29,7 @@ export default function PatientGenerator() {
     { id: createBatchId(), startName: "EPRNAAAA", count: 10 }
   ]);
   const [fileName, setFileName] = useState("");
+  const [includeRCEncounters, setIncludeRCEncounters] = useState(true);
 
   const addBatch = () => {
     setBatches([...batches, { id: createBatchId(), startName: "", count: 10 }]);
@@ -52,7 +54,9 @@ export default function PatientGenerator() {
         }
       }
 
-      await generatePatientData(batches, fileName);
+      await generatePatientData(batches, fileName, {
+        includeRCEncounters
+      });
       
       toast({
         title: "Success!",
@@ -115,8 +119,8 @@ export default function PatientGenerator() {
                   <Input 
                     value={batch.startName}
                     onChange={(e) => updateBatch(batch.id, 'startName', e.target.value.toUpperCase())}
-                    placeholder="e.g. EPRNAAAA"
-                    className="bg-black/20 border-white/10 font-mono tracking-widest uppercase placeholder:normal-case placeholder:tracking-normal"
+                    placeholder="E.G. EPRNAAAA"
+                    className="bg-black/20 border-white/10 font-mono tracking-widest uppercase placeholder:uppercase placeholder:tracking-normal"
                   />
                   
                   <div className="flex justify-center">
@@ -124,7 +128,6 @@ export default function PatientGenerator() {
                       value={batch.count}
                       onChange={(val) => updateBatch(batch.id, 'count', val)}
                       min={1}
-                      className="w-full"
                     />
                   </div>
 
@@ -140,6 +143,20 @@ export default function PatientGenerator() {
                 </motion.div>
               ))}
             </AnimatePresence>
+          </div>
+
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <Switch checked={includeRCEncounters} onCheckedChange={setIncludeRCEncounters} />
+            <p className="flex items-center gap-2">
+              {includeRCEncounters ? (
+                "RC encounter columns added"
+              ) : (
+                <>
+                  RC encounter columns not added
+                  <span className="text-amber-300">(Patient creation in RC only)</span>
+                </>
+              )}
+            </p>
           </div>
 
           <div className="flex gap-4 pt-4 border-t border-white/10">

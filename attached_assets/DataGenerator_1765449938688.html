@@ -26,6 +26,15 @@
     .row .rm{background:#1f2937;border:1px solid rgba(255,255,255,.1);color:#e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer}
     .row .rm:hover{background:#374151}
     .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .toggle-row{margin-top:14px;display:flex;align-items:center;gap:12px;font-size:14px;color:rgba(229,231,235,.8)}
+    .toggle-status{font-size:14px;color:rgba(229,231,235,.8)}
+    .toggle-status .note{color:#fcd34d;font-weight:600;margin-left:6px}
+    .switch{position:relative;display:inline-block;width:46px;height:26px}
+    .switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#374151;border-radius:999px;transition:.2s}
+    .slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s}
+    .switch input:checked + .slider{background:#10b981}
+    .switch input:checked + .slider:before{transform:translateX(20px)}
     button{cursor:pointer;border:none;border-radius:12px;padding:12px 16px;font-weight:600}
     .add{background:var(--muted);color:var(--text);border:1px solid rgba(255,255,255,.12)}
     .gen{background:var(--accent);color:#052e16}
@@ -58,6 +67,13 @@
       <div class="body">
         <div class="grid-head"><div>Starting Patient Name (e.g., EPRNAAAA)</div><div>No. of Patients</div><div>Action</div></div>
         <div id="rows"></div>
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="encounterToggle" checked />
+            <span class="slider"></span>
+          </label>
+          <div id="toggleStatus" class="toggle-status">RC encounter columns added</div>
+        </div>
         <div class="controls">
           <button class="add" id="addRowBtn">+ Add another batch</button>
           <input id="fileName" class="filename" placeholder="File name (optional) e.g. Patients_Run_12" />
@@ -86,6 +102,29 @@
   <script>
     const LETTERS = "ABCDEFGHJKLMNOPQRSTUVWXYZ"; 
     const L2I = Object.fromEntries([...LETTERS].map((c, i) => [c, i]));
+    let includeRCEncounters = true;
+
+    function updateEncounterToggle(){
+      const status = document.getElementById('toggleStatus');
+      if(status){
+        if(includeRCEncounters){
+          status.textContent = "RC encounter columns added";
+        } else {
+          status.innerHTML = 'RC encounter columns not added <span class="note">(Patient creation in RC only)</span>';
+        }
+      }
+    }
+
+    function setupEncounterToggle(){
+      const toggle = document.getElementById('encounterToggle');
+      if(!toggle) return;
+      includeRCEncounters = toggle.checked;
+      updateEncounterToggle();
+      toggle.addEventListener('change', () => {
+        includeRCEncounters = toggle.checked;
+        updateEncounterToggle();
+      });
+    }
 
     function isValidStartName(name){
       if(!name || name.length < 5) return false;
@@ -137,17 +176,34 @@
       return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
     }
 
-    async function buildAndDownloadExcelJS(data){
-      const header = [
+    async function buildAndDownloadExcelJS(data, includeEncounters){
+      const fullHeader = [
         "Index","Scenario","TestCase","LastName","FirstName","PatientMRN","HealthPlan","Address","City","Zip","State","Gender","DOB",
         "RCEncounterLocation","RCEncounter","Encounter1","Encounter2","SecondaryPersonnel","PersonID","ReferralSource1","ReferralSource2","ReferralReason1","ReferralReason2","RCEncounterAdded","Encounter1Added","Encounter2Added","HP1Added","HP2Added","Unassigned"
       ];
+      const patientOnlyHeader = [
+        "Index","Scenario","TestCase","LastName","FirstName","PatientMRN","HealthPlan","Address","City","Zip","State","Gender","DOB",
+        "RCEncounterLocation","RCEncounter","RCEncounterAdded"
+      ];
+      const withEncounters = includeEncounters !== false;
+      const header = withEncounters ? fullHeader : patientOnlyHeader;
+      const rcEncounterValue = withEncounters ? "Historical" : "CKCC-ESKD";
 
-      const rows = data.map(r => [
-        r.index, "", "", r.last, r.first, "","", r.addr.Address, r.addr.City, String(r.addr.Zip||'').padStart(5,'0'),
-        r.addr.State, r.gender, r.dob,
-        "ED","Historical","CKCC - ESKD","TOC - ESKD","","","Care Manager","Care Manager","Care coordination","Care coordination","","","","","", ""
-      ]);
+      const rows = data.map(r => {
+        const base = [
+          r.index, "", "", r.last, r.first, "","", r.addr.Address, r.addr.City, String(r.addr.Zip||'').padStart(5,'0'),
+          r.addr.State, r.gender, r.dob
+        ];
+
+        if(withEncounters){
+          return [
+            ...base,
+            "ED", rcEncounterValue, "CKCC - ESKD", "TOC - ESKD", "", "", "Care Manager", "Care Manager", "Care coordination", "Care coordination", "", "", "", "", "", ""
+          ];
+        }
+
+        return [...base, "ED", rcEncounterValue, ""];
+      });
 
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet('Patients', { views: [{ state: 'frozen', ySplit: 1 }] });
@@ -205,7 +261,7 @@
           });
         }
 
-        buildAndDownloadExcelJS(all);
+        buildAndDownloadExcelJS(all, includeRCEncounters);
       }catch(err){ console.error(err); showError(err.message||String(err)); }
     }
 
@@ -225,6 +281,7 @@
     document.getElementById('addRowBtn').addEventListener('click', ()=> addRow('', 1));
     document.getElementById('generateBtn').addEventListener('click', generateAndDownload);
     addRow('EPRNAAAA', 10);
+    setupEncounterToggle();
   </script>
 </body>
 </html>
