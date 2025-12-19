@@ -4,6 +4,16 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { metaImagesPlugin } from "./vite-plugin-meta-images";
+import * as nodeCrypto from "crypto";
+
+// Polyfill crypto.hash for Node versions that don't support it (e.g., Node 18 on CI)
+if (!(nodeCrypto as any).hash) {
+  (nodeCrypto as any).hash = (algorithm: string, data: any, encoding?: any) => {
+    const h = nodeCrypto.createHash(algorithm);
+    h.update(data);
+    return h.digest(encoding);
+  };
+}
 
 export default defineConfig({
   plugins: [
