@@ -32,7 +32,7 @@ export default function Step4({
   return (
     <GlassCard className="w-full max-w-3xl">
       <WizardHeader 
-        step={4} 
+        step={3} 
         title="Assign Pre-Requisites" 
         subtitle="Map specific applications to each pre-requisite" 
       />

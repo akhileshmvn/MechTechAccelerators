@@ -6,6 +6,7 @@ export interface TestCase {
   name: string;
   preReqCount: number;
   preReqs: { app: string; custom?: string }[];
+  testRailLink?: string;
 }
 
 export interface ScenarioData {
@@ -19,6 +20,7 @@ export interface ScenarioData {
 type NormalizedTestCase = TestCase & {
   name: string;
   preReqs: { app: string; custom?: string }[];
+  testRailLink?: string;
 };
 
 const DEFAULT_CUSTOM_APP = 'CustomApp';
@@ -27,6 +29,7 @@ const normalizeTestCases = (testCases: TestCase[]): NormalizedTestCase[] =>
   testCases.map((tc, index) => {
     const name = tc.name?.trim() || `Test_Case_${index + 1}`;
     const count = Math.max(1, Number(tc.preReqCount) || tc.preReqs?.length || 1);
+    const testRailLink = tc.testRailLink?.trim() || '';
     const normalizedReqs = Array.from({ length: count }, (_, preIdx) => {
       const existing = tc.preReqs?.[preIdx];
       return {
@@ -39,7 +42,8 @@ const normalizeTestCases = (testCases: TestCase[]): NormalizedTestCase[] =>
       ...tc,
       name,
       preReqCount: count,
-      preReqs: normalizedReqs
+      preReqs: normalizedReqs,
+      testRailLink
     };
   });
 
@@ -132,12 +136,20 @@ End If`
   .join('\n')}
 End Repeat`;
 
-const buildTestScript = (tcName: string, scenario: string, author: string, app: string) =>
-  `#Author: ${author}
+const buildTestScript = (
+  tcName: string,
+  scenario: string,
+  author: string,
+  app: string,
+  testRailLink?: string
+) => {
+  const sanitizedLink = testRailLink?.trim() || '';
+
+  return `#Author: ${author}
 #Application: ${app}
 #Workflow: ${scenario}
 #Test Case Name: TCP1_${tcName}
-#TestRail Link: 
+#TestRail Link: ${sanitizedLink}
 
 (*Prerequisites
 
@@ -153,6 +165,7 @@ Catch
 	Put The Result
 End Try
 EndTestCase "TCP1_${tcName}"`;
+};
 
 export const generateZip = async (data: ScenarioData) => {
   const scenario = data.scenarioName?.trim();
@@ -198,7 +211,7 @@ export const generateZip = async (data: ScenarioData) => {
   workflowFolder.file(`${scenario}.script`, buildMainWorkflow(scenario, normalizedCases));
 
   normalizedCases.forEach((tc) => {
-    const script = buildTestScript(tc.name, scenario, author, testsApp);
+    const script = buildTestScript(tc.name, scenario, author, testsApp, tc.testRailLink);
     testsFolder.file(`TCP1_${tc.name}.script`, script);
   });
 

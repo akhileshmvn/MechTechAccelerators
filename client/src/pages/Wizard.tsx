@@ -2,7 +2,6 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { generateZip, TestCase } from "@/lib/generator";
 import Step1 from "@/components/steps/Step1";
-import Step2 from "@/components/steps/Step2";
 import Step3 from "@/components/steps/Step3";
 import Step4 from "@/components/steps/Step4";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +22,8 @@ const createTestCase = (index: number): TestCase => ({
   id: createTestCaseId(),
   name: `Test_Case_${index + 1}`,
   preReqCount: 1,
-  preReqs: [{ app: "PowerChart" }]
+  preReqs: [{ app: "PowerChart" }],
+  testRailLink: ""
 });
 
 export default function Wizard() {
@@ -33,33 +33,18 @@ export default function Wizard() {
   // Data State
   const [scenarioName, setScenarioName] = useState("");
   const [author, setAuthor] = useState("");
-  const [tcCount, setTcCount] = useState(1);
   const [testCases, setTestCases] = useState<TestCase[]>(() => [createTestCase(0)]);
   const [testsApp, setTestsApp] = useState("PowerChart");
   const [testsAppCustom, setTestsAppCustom] = useState("");
 
-  const nextStep = () => setStep((s) => Math.min(s + 1, 4));
+  const nextStep = () => setStep((s) => Math.min(s + 1, 3));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
-
-  const handleTcCountUpdate = (count: number) => {
-    const safeCount = Math.max(1, count);
-    setTcCount(safeCount);
-    // Initialize or resize testCases array
-    const newCases: TestCase[] = Array.from({ length: safeCount }, (_, i) => {
-      // Preserve existing data if available
-      if (testCases[i]) return testCases[i];
-      
-      return createTestCase(i);
-    });
-    setTestCases(newCases);
-  };
 
   const handleReset = () => {
     if (confirm("Are you sure you want to reset everything?")) {
       setStep(1);
       setScenarioName("");
       setAuthor("");
-      setTcCount(1);
       setTestCases([createTestCase(0)]);
       setTestsApp("PowerChart");
       setTestsAppCustom("");
@@ -112,16 +97,6 @@ export default function Wizard() {
           )}
           {step === 2 && (
             <motion.div key="step2" className="w-full flex justify-center">
-              <Step2 
-                count={tcCount} 
-                onUpdate={handleTcCountUpdate}
-                onNext={nextStep}
-                onBack={prevStep}
-              />
-            </motion.div>
-          )}
-          {step === 3 && (
-            <motion.div key="step3" className="w-full flex justify-center">
               <Step3 
                 testCases={testCases} 
                 onUpdate={setTestCases}
@@ -130,8 +105,8 @@ export default function Wizard() {
               />
             </motion.div>
           )}
-          {step === 4 && (
-            <motion.div key="step4" className="w-full flex justify-center">
+          {step === 3 && (
+            <motion.div key="step3" className="w-full flex justify-center">
               <Step4 
                 testCases={testCases} 
                 testsApp={testsApp}
