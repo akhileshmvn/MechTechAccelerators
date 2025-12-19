@@ -48,4 +48,7 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  crypto: {
+    // Your crypto configuration here
+  },
 });
