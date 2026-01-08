@@ -34,7 +34,7 @@ export function WizardHeader({ step, title, subtitle, showStep = true }: { step:
           animate={{ opacity: 1 }}
           className="mb-2 text-xs font-bold tracking-[0.2em] text-primary/80 uppercase"
         >
-          Step {step} of 4
+          Step {step} of 3
         </motion.div>
       )}
       <motion.h1 
