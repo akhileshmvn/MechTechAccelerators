@@ -12,6 +12,7 @@ const FULL_HEADER = [
   "LastName",
   "FirstName",
   "PatientMRN",
+  "PersonID",
   "HealthPlan",
   "Address",
   "City",
@@ -24,7 +25,6 @@ const FULL_HEADER = [
   "Encounter1",
   "Encounter2",
   "SecondaryPersonnel",
-  "PersonID",
   "ReferralSource1",
   "ReferralSource2",
   "ReferralReason1",
@@ -171,6 +171,44 @@ export async function generatePatientData(
   const rcEncounterValue = includeRCEncounters ? "Historical" : "CKCC-ESKD";
 
   const rows = all.map((r) => {
+    if (includeRCEncounters) {
+      const base = [
+        r.index,
+        "",
+        "",
+        r.last,
+        r.first,
+        "",
+        "",
+        "",
+        r.addr.Address,
+        r.addr.City,
+        String(r.addr.Zip || '').padStart(5, '0'),
+        r.addr.State,
+        r.gender,
+        r.dob
+      ];
+
+      return [
+        ...base,
+        "ED",
+        rcEncounterValue,
+        "CKCC - ESKD",
+        "TOC - ESKD",
+        "",
+        "Care Manager",
+        "Care Manager",
+        "Care coordination",
+        "Care coordination",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ];
+    }
+
     const base = [
       r.index,
       "",
@@ -186,28 +224,6 @@ export async function generatePatientData(
       r.gender,
       r.dob
     ];
-
-    if (includeRCEncounters) {
-      return [
-        ...base,
-        "ED",
-        rcEncounterValue,
-        "CKCC - ESKD",
-        "TOC - ESKD",
-        "",
-        "",
-        "Care Manager",
-        "Care Manager",
-        "Care coordination",
-        "Care coordination",
-        "",
-        "",
-        "",
-        "",
-        "",
-        ""
-      ];
-    }
 
     return [...base, "ED", rcEncounterValue, ""];
   });
