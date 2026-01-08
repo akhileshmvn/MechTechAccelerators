@@ -2,8 +2,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { GlassCard, WizardHeader } from "@/components/ui/glass-card";
-import { ArrowRight, ArrowLeft } from "lucide-react";
+import { hasNameWarning, normalizeName } from "@/lib/name-utils";
+import { ArrowRight, ArrowLeft, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
+import { useState } from "react";
 
 interface Step1Props {
   scenarioName: string;
@@ -15,6 +17,13 @@ interface Step1Props {
 export default function Step1({ scenarioName, author, onUpdate, onNext }: Step1Props) {
   const isValid = scenarioName.trim().length > 0 && author.trim().length > 0;
   const [, setLocation] = useLocation();
+  const [scenarioTouched, setScenarioTouched] = useState(false);
+  const [scenarioFocused, setScenarioFocused] = useState(false);
+  const scenarioHasWarning = hasNameWarning(scenarioName);
+  const scenarioSuggestion = scenarioHasWarning ? normalizeName(scenarioName) : "";
+  const canFixScenario =
+    scenarioHasWarning && scenarioSuggestion.length > 0 && scenarioSuggestion !== scenarioName.trim();
+  const showScenarioWarning = scenarioTouched && scenarioHasWarning && !scenarioFocused;
 
   return (
     <GlassCard className="w-full max-w-lg">
@@ -29,14 +38,49 @@ export default function Step1({ scenarioName, author, onUpdate, onNext }: Step1P
           <Label htmlFor="scenarioName" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Scenario Name
           </Label>
-          <Input
-            id="scenarioName"
-            placeholder="e.g. Login_Authentication_Flow"
-            value={scenarioName}
-            onChange={(e) => onUpdate({ scenarioName: e.target.value, author })}
-            className="h-12 bg-white/5 border-white/10 text-lg font-mono placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-primary/20 transition-all"
-            autoFocus
-          />
+          <div className="relative">
+            <Input
+              id="scenarioName"
+              placeholder="e.g. Login_Authentication_Flow"
+              value={scenarioName}
+              onChange={(e) => onUpdate({ scenarioName: e.target.value, author })}
+              onFocus={() => setScenarioFocused(true)}
+              onBlur={() => {
+                setScenarioFocused(false);
+                setScenarioTouched(true);
+              }}
+              className={`h-12 bg-white/5 border-white/10 text-lg font-mono placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-primary/20 transition-all ${
+                showScenarioWarning ? "border-yellow-400/80 focus-visible:ring-yellow-400/30 pr-10" : ""
+              }`}
+              autoFocus
+            />
+            {showScenarioWarning && (
+              <div
+                aria-label="Scenario name warning"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-yellow-400/90"
+              >
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+            )}
+          </div>
+          {showScenarioWarning && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-yellow-300/90">
+              <span>Double underscore or space detected.</span>
+              {scenarioSuggestion && (
+                <span className="font-mono text-yellow-200">Suggested: {scenarioSuggestion}</span>
+              )}
+              {canFixScenario && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-yellow-400 text-black border border-yellow-500 hover:bg-yellow-300 h-6 px-3 text-[11px]"
+                  onClick={() => onUpdate({ scenarioName: scenarioSuggestion, author })}
+                >
+                  Fix
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
