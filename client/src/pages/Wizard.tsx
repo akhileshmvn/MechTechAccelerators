@@ -2,8 +2,8 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { generateZip, TestCase } from "@/lib/generator";
 import Step1 from "@/components/steps/Step1";
+import Step2 from "@/components/steps/Step2";
 import Step3 from "@/components/steps/Step3";
-import Step4 from "@/components/steps/Step4";
 import { useToast } from "@/hooks/use-toast";
 
 const createTestCaseId = () => {
@@ -97,7 +97,7 @@ export default function Wizard() {
           )}
           {step === 2 && (
             <motion.div key="step2" className="w-full flex justify-center">
-              <Step3 
+              <Step2 
                 testCases={testCases} 
                 onUpdate={setTestCases}
                 onNext={nextStep}
@@ -107,7 +107,7 @@ export default function Wizard() {
           )}
           {step === 3 && (
             <motion.div key="step3" className="w-full flex justify-center">
-              <Step4 
+              <Step3 
                 testCases={testCases} 
                 testsApp={testsApp}
                 testsAppCustom={testsAppCustom}

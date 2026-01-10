@@ -185,10 +185,10 @@ export default function PatientGenerator() {
           </div>
         </div>
         
-        <div className="mt-8 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-200 flex gap-3 items-start">
-          <AlertCircle className="h-5 w-5 shrink-0 text-blue-400 mt-0.5" />
+        <div className="mt-8 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-200 flex gap-3 items-start note-text">
+          <AlertCircle className="h-5 w-5 shrink-0 text-blue-400 mt-0.5 note-icon" />
           <div className="space-y-1">
-            <p className="font-medium text-blue-300">Important Note:</p>
+            <p className="font-medium text-blue-300 note-title">Important Note:</p>
             <p className="opacity-80">The columns <b>Scenario, TestCase, HealthPlan, and Secondary Personnel</b> must be manually updated in the generated Excel file before use.</p>
           </div>
         </div>

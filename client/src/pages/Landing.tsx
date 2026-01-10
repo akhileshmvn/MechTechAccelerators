@@ -71,7 +71,7 @@ export default function Landing() {
                     <card.icon className={`w-8 h-8 ${card.iconColor}`} />
                   </div>
                   
-                  <h3 className="text-2xl font-bold text-white mb-3">{card.title}</h3>
+                  <h3 className="text-2xl font-bold text-white mb-3 landing-card-title">{card.title}</h3>
                   <p className="text-muted-foreground leading-relaxed mb-8 flex-1">
                     {card.description}
                   </p>
