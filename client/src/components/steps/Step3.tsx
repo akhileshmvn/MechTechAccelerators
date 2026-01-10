@@ -41,9 +41,10 @@ export default function Step3({
         <div className="max-h-[60vh] overflow-y-auto custom-scrollbar rounded-2xl border border-white/10 bg-white/5">
           {testCases.map((tc, tcIndex) => (
             <div key={tc.id} className="grid gap-4 border-b border-white/10 md:grid-cols-[minmax(0,240px)_1fr]">
-              <div className="p-5 flex flex-col items-center justify-center text-center">
-                <div className="text-sm text-muted-foreground mb-2">Test Case {tcIndex + 1}</div>
-                <div className="text-lg font-semibold text-primary">{tc.name}</div>
+              <div className="p-5 flex items-center justify-center text-center">
+                <div className="text-lg font-semibold text-primary">
+                  TC {tcIndex + 1}. {tc.name}
+                </div>
               </div>
               <div className="divide-y divide-white/10">
                 {tc.preReqs.map((req, reqIndex) => (
@@ -87,7 +88,7 @@ export default function Step3({
         </div>
 
         <div className="flex flex-wrap items-center gap-4 rounded-xl bg-blue-500/10 border border-blue-500/20 px-4 py-3">
-          <span className="text-sm font-medium text-blue-200 dark:text-blue-200 text-blue-900">
+          <span className="text-sm font-medium text-blue-200 dark:text-blue-300 text-blue-900">
             Application where test cases will be executed:
           </span>
           <Select 
