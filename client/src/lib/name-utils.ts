@@ -7,5 +7,9 @@ export const hasNameWarning = (value: string) => {
 
 export const normalizeName = (value: string) => {
   if (!value) return "";
-  return value.trim().replace(/\s+/g, "_").replace(/_+/g, "_");
+  return value
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
 };
