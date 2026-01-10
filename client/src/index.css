@@ -142,6 +142,13 @@
 .light .text-yellow-400\/90 { color: hsl(38, 95%, 25%) !important; }
 .light .border-yellow-400\/80 { border-color: hsl(38, 95%, 25%) !important; }
 .light .focus-visible\:ring-yellow-400\/30:focus-visible { --tw-ring-color: hsl(38, 95%, 35%) !important; }
+.light .app-exec-label { color: hsl(215, 30%, 18%) !important; }
+.app-exec-label { color: hsl(210, 90%, 85%) !important; }
+.light .landing-hero {
+  color: hsl(222, 47%, 11%) !important;
+  -webkit-text-fill-color: hsl(222, 47%, 11%) !important;
+  background-image: none !important;
+}
 
 /* Custom scrollbar for the wizard */
 ::-webkit-scrollbar {
