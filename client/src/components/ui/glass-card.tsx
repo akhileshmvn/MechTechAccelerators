@@ -14,8 +14,8 @@ export function GlassCard({ children, className, ...props }: GlassCardProps) {
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-8 backdrop-blur-xl shadow-2xl",
-        "before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/5 before:to-transparent before:opacity-50",
+        "relative overflow-hidden rounded-2xl border border-border/40 bg-card/70 p-8 backdrop-blur-xl shadow-2xl",
+        "before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-foreground/5 before:to-transparent before:opacity-50",
         className
       )}
       {...props}
