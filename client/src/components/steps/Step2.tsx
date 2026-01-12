@@ -163,7 +163,6 @@ export default function Step2({ testCases, onUpdate, onNext, onBack }: Step2Prop
                   </div>
                   {showWarning && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-yellow-300/90">
-                      <span>Suggestion:</span>
                       {suggestion && (
                         <span className="font-mono text-yellow-200">Suggested: {suggestion}</span>
                       )}

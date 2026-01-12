@@ -65,7 +65,6 @@ export default function Step1({ scenarioName, author, onUpdate, onNext }: Step1P
           </div>
           {showScenarioWarning && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-yellow-300/90">
-              <span>Suggestion:</span>
               {scenarioSuggestion && (
                 <span className="font-mono text-yellow-200">Suggested: {scenarioSuggestion}</span>
               )}
