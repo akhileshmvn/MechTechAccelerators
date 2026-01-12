@@ -72,12 +72,11 @@ const buildPreReqScript = (
 
   const suffix = tcPreReqCount > 1 ? `_${preIndex + 1}` : '';
   const fullName = `PreReq_${tcName}${suffix}`;
-  const usernameLine = username ? `#Login Username: ${username}\n` : "";
+  const usernameLine = username ? `#Username: ${username}\n` : "";
 
   return `#Author: ${author}
 #Application: ${app}
-#User: ${usernameLine}
-#Workflow: ${workflowLabel}
+${usernameLine}#Workflow: ${workflowLabel}
 #Test Case Name: ${fullName}
 
 (*Prerequisites
