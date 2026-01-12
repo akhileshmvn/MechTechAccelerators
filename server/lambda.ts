@@ -1,12 +1,12 @@
-import serverlessExpress from "@vendia/serverless-express";
+import serverless from "serverless-http";
 import { app, ensureRoutes } from "./app";
 
-let cachedHandler: ReturnType<typeof serverlessExpress> | null = null;
+let cachedHandler: ReturnType<typeof serverless> | null = null;
 
-export const handler = async (event: any, context: any, callback?: any) => {
+export const handler = async (event: any, context: any) => {
   await ensureRoutes();
   if (!cachedHandler) {
-    cachedHandler = serverlessExpress({ app });
+    cachedHandler = serverless(app);
   }
-  return cachedHandler(event, context, callback);
+  return cachedHandler(event, context);
 };
