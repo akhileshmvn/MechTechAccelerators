@@ -11,8 +11,9 @@ interface Step3Props {
   testCases: TestCase[];
   testsApp: string;
   testsAppCustom: string;
+  testsAppUsername: string;
   onUpdateTestCase: (index: number, reqIndex: number, field: string, value: string) => void;
-  onUpdateApp: (app: string, custom?: string) => void;
+  onUpdateApp: (app: string, custom?: string, username?: string) => void;
   onGenerate: () => void;
   onReset: () => void;
   onBack: () => void;
@@ -22,12 +23,15 @@ export default function Step3({
   testCases, 
   testsApp, 
   testsAppCustom, 
+  testsAppUsername,
   onUpdateTestCase, 
   onUpdateApp, 
   onGenerate, 
   onReset, 
   onBack 
 }: Step3Props) {
+  const showUsernameForApp = (app: string) =>
+    app === "PowerChart" || app === "Revenue Cycle" || app === "Custom";
 
   return (
     <GlassCard className="w-full max-w-6xl">
@@ -40,12 +44,12 @@ export default function Step3({
       <div className="space-y-6">
         <div className="max-h-[60vh] overflow-y-auto custom-scrollbar rounded-2xl border border-white/10 bg-white/5">
           {testCases.map((tc, tcIndex) => (
-            <div key={tc.id} className="grid gap-4 border-b border-white/10 md:grid-cols-[minmax(0,240px)_1fr]">
+            <div key={tc.id} className="grid gap-4 border-b border-white/10 md:grid-cols-[minmax(0,320px)_1fr]">
               <div className="px-5 py-3 flex items-center gap-3 text-left">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm border border-primary/20">
                   {tcIndex + 1}
                 </div>
-                <div className="text-lg font-semibold text-primary">
+                <div className="text-lg font-semibold text-primary break-words">
                   {tc.name}
                 </div>
               </div>
@@ -55,12 +59,12 @@ export default function Step3({
                     <Label className="w-20 text-xs text-muted-foreground uppercase shrink-0">
                       Pre-Req {reqIndex + 1}
                     </Label>
-                    <div className="flex-1 flex gap-2 min-w-[220px]">
+                    <div className="flex-1 flex flex-wrap gap-2 min-w-[240px]">
                       <Select 
                         value={req.app} 
                         onValueChange={(val) => onUpdateTestCase(tcIndex, reqIndex, 'app', val)}
                       >
-                        <SelectTrigger className={`bg-black/20 border-white/10 h-9 transition-all duration-300 ${req.app === 'Custom' ? 'w-[140px]' : 'w-full'}`}>
+                        <SelectTrigger className={`bg-black/20 border-white/10 h-9 transition-all duration-300 ${req.app === 'Custom' ? 'w-[160px]' : 'w-[220px]'}`}>
                           <SelectValue placeholder="Select App" />
                         </SelectTrigger>
                         <SelectContent>
@@ -73,7 +77,7 @@ export default function Step3({
                       </Select>
                       
                       {req.app === 'Custom' && (
-                        <motion.div initial={{ opacity: 0, flex: 0 }} animate={{ opacity: 1, flex: 1 }} className="min-w-0">
+                        <motion.div initial={{ opacity: 0, flex: 0 }} animate={{ opacity: 1, flex: 1 }} className="min-w-[200px]">
                           <Input 
                             placeholder="Custom App Name"
                             value={req.custom || ''}
@@ -81,6 +85,14 @@ export default function Step3({
                             className="bg-black/20 border-white/10 h-9 w-full"
                           />
                         </motion.div>
+                      )}
+                      {showUsernameForApp(req.app) && (
+                        <Input
+                          placeholder="Username (optional)"
+                          value={req.username || ''}
+                          onChange={(e) => onUpdateTestCase(tcIndex, reqIndex, 'username', e.target.value)}
+                          className="bg-black/20 border-white/10 h-9 min-w-[200px] flex-1"
+                        />
                       )}
                     </div>
                   </div>
@@ -96,7 +108,7 @@ export default function Step3({
           </span>
           <Select 
             value={testsApp} 
-            onValueChange={(val) => onUpdateApp(val, testsAppCustom)}
+            onValueChange={(val) => onUpdateApp(val, testsAppCustom, testsAppUsername)}
           >
             <SelectTrigger className={`bg-black/20 border-white/10 transition-all duration-300 ${testsApp === 'Custom' ? 'w-[140px]' : 'w-[220px]'}`}>
               <SelectValue />
@@ -114,7 +126,15 @@ export default function Step3({
             <Input 
               placeholder="Custom Test App"
               value={testsAppCustom}
-              onChange={(e) => onUpdateApp(testsApp, e.target.value)}
+              onChange={(e) => onUpdateApp(testsApp, e.target.value, testsAppUsername)}
+              className="bg-black/20 border-white/10 flex-1 min-w-[200px]"
+            />
+          )}
+          {showUsernameForApp(testsApp) && (
+            <Input
+              placeholder="Username (optional)"
+              value={testsAppUsername}
+              onChange={(e) => onUpdateApp(testsApp, testsAppCustom, e.target.value)}
               className="bg-black/20 border-white/10 flex-1 min-w-[200px]"
             />
           )}

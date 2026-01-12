@@ -5,7 +5,7 @@ export interface TestCase {
   id: string;
   name: string;
   preReqCount: number;
-  preReqs: { app: string; custom?: string }[];
+  preReqs: { app: string; custom?: string; username?: string }[];
   testRailLink?: string;
 }
 
@@ -15,11 +15,12 @@ export interface ScenarioData {
   testCases: TestCase[];
   testsApp: string;
   testsAppCustom?: string;
+  testsAppUsername?: string;
 }
 
 type NormalizedTestCase = TestCase & {
   name: string;
-  preReqs: { app: string; custom?: string }[];
+  preReqs: { app: string; custom?: string; username?: string }[];
   testRailLink?: string;
 };
 
@@ -34,7 +35,8 @@ const normalizeTestCases = (testCases: TestCase[]): NormalizedTestCase[] =>
       const existing = tc.preReqs?.[preIdx];
       return {
         app: existing?.app || 'PowerChart',
-        custom: existing?.custom?.trim()
+        custom: existing?.custom?.trim(),
+        username: existing?.username?.trim()
       };
     });
 
@@ -57,7 +59,8 @@ const buildPreReqScript = (
   maxPre: number,
   author: string,
   scenario: string,
-  app: string
+  app: string,
+  username?: string
 ) => {
   let workflowLabel: string;
   if (maxPre === 1) {
@@ -69,9 +72,11 @@ const buildPreReqScript = (
 
   const suffix = tcPreReqCount > 1 ? `_${preIndex + 1}` : '';
   const fullName = `PreReq_${tcName}${suffix}`;
+  const usernameLine = username ? `#Login Username: ${username}\n` : "";
 
   return `#Author: ${author}
 #Application: ${app}
+#User: ${usernameLine}
 #Workflow: ${workflowLabel}
 #Test Case Name: ${fullName}
 
@@ -141,13 +146,15 @@ const buildTestScript = (
   scenario: string,
   author: string,
   app: string,
-  testRailLink?: string
+  testRailLink?: string,
+  username?: string
 ) => {
   const sanitizedLink = testRailLink?.trim() || '';
+  const usernameLine = username ? `#Login Username: ${username}\n` : "";
 
   return `#Author: ${author}
 #Application: ${app}
-#Workflow: ${scenario}
+${usernameLine}#Workflow: ${scenario}
 #Test Case Name: TCP1_${tcName}
 #TestRail Link: ${sanitizedLink}
 
@@ -182,6 +189,7 @@ export const generateZip = async (data: ScenarioData) => {
   const normalizedCases = normalizeTestCases(data.testCases);
   const maxPre = Math.max(...normalizedCases.map((tc) => tc.preReqs.length));
   const testsApp = getApplicationName(data.testsApp || 'PowerChart', data.testsAppCustom);
+  const testsAppUsername = data.testsAppUsername?.trim();
 
   const zip = new JSZip();
   const preFolder = zip.folder('PreRequisites');
@@ -196,7 +204,7 @@ export const generateZip = async (data: ScenarioData) => {
   normalizedCases.forEach((tc, tcIndex) => {
     tc.preReqs.forEach((req, preIdx) => {
       const app = getApplicationName(req.app, req.custom);
-      const script = buildPreReqScript(tc.name, preIdx, tc.preReqs.length, maxPre, author, scenario, app);
+      const script = buildPreReqScript(tc.name, preIdx, tc.preReqs.length, maxPre, author, scenario, app, req.username);
       const suffix = tc.preReqs.length > 1 ? `_${preIdx + 1}` : '';
       const fileName = `PreReq_${tc.name}${suffix}.script`;
       preFolder.file(fileName, script);
@@ -211,7 +219,7 @@ export const generateZip = async (data: ScenarioData) => {
   workflowFolder.file(`${scenario}.script`, buildMainWorkflow(scenario, normalizedCases));
 
   normalizedCases.forEach((tc) => {
-    const script = buildTestScript(tc.name, scenario, author, testsApp, tc.testRailLink);
+    const script = buildTestScript(tc.name, scenario, author, testsApp, tc.testRailLink, testsAppUsername);
     testsFolder.file(`TCP1_${tc.name}.script`, script);
   });
 

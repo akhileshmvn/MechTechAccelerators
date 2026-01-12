@@ -36,6 +36,7 @@ export default function Wizard() {
   const [testCases, setTestCases] = useState<TestCase[]>(() => [createTestCase(0)]);
   const [testsApp, setTestsApp] = useState("PowerChart");
   const [testsAppCustom, setTestsAppCustom] = useState("");
+  const [testsAppUsername, setTestsAppUsername] = useState("");
 
   const nextStep = () => setStep((s) => Math.min(s + 1, 3));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
@@ -48,6 +49,7 @@ export default function Wizard() {
       setTestCases([createTestCase(0)]);
       setTestsApp("PowerChart");
       setTestsAppCustom("");
+      setTestsAppUsername("");
     }
   };
 
@@ -111,15 +113,18 @@ export default function Wizard() {
                 testCases={testCases} 
                 testsApp={testsApp}
                 testsAppCustom={testsAppCustom}
+                testsAppUsername={testsAppUsername}
                 onUpdateTestCase={(idx, rIdx, field, val) => {
                   const newCases = [...testCases];
                   if (field === 'app') newCases[idx].preReqs[rIdx].app = val;
                   if (field === 'custom') newCases[idx].preReqs[rIdx].custom = val;
+                  if (field === 'username') newCases[idx].preReqs[rIdx].username = val;
                   setTestCases(newCases);
                 }}
-                onUpdateApp={(app, custom) => {
+                onUpdateApp={(app, custom, username) => {
                   setTestsApp(app);
                   if (custom !== undefined) setTestsAppCustom(custom);
+                  if (username !== undefined) setTestsAppUsername(username);
                 }}
                 onGenerate={handleGenerate}
                 onReset={handleReset}
