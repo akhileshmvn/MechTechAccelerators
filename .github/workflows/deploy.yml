@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # Step 3.5: Push DB schema (requires DATABASE_URL secret)
+      - name: Push database schema
+        run: npm run db:push
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       # Step 4: Build Vite project
       - name: Build project
         run: npm run build
