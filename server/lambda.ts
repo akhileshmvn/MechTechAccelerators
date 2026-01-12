@@ -3,10 +3,10 @@ import { app, ensureRoutes } from "./app";
 
 let cachedHandler: ReturnType<typeof serverlessExpress> | null = null;
 
-export const handler = async (...args: Parameters<ReturnType<typeof serverlessExpress>>) => {
+export const handler = async (event: any, context: any, callback?: any) => {
   await ensureRoutes();
   if (!cachedHandler) {
     cachedHandler = serverlessExpress({ app });
   }
-  return cachedHandler(...args);
+  return cachedHandler(event, context, callback);
 };
