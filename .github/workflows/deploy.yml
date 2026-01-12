@@ -26,7 +26,7 @@ jobs:
 
       # Step 3.5: Push DB schema (only if DATABASE_URL secret is set)
       - name: Push database schema
-        if: ${{ secrets.DATABASE_URL != '' }}
+        if: ${{ env.DATABASE_URL != '' }}
         run: npm run db:push
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
