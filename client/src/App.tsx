@@ -23,11 +23,7 @@ function Router() {
 }
 
 function App() {
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof window === "undefined") return "dark";
-    const stored = window.localStorage.getItem("mechtech-theme");
-    return stored === "light" ? "light" : "dark";
-  });
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
     const root = document.documentElement;
