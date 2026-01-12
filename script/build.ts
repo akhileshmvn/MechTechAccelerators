@@ -5,6 +5,7 @@ import { rm, readFile } from "fs/promises";
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
 const allowlist = [
+  "@vendia/serverless-express",
   "@google/generative-ai",
   "axios",
   "connect-pg-simple",
@@ -57,6 +58,21 @@ async function buildAll() {
     },
     minify: true,
     external: externals,
+    logLevel: "info",
+  });
+
+  console.log("building lambda...");
+  await esbuild({
+    entryPoints: ["server/lambda.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/lambda.cjs",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: true,
+    external: [],
     logLevel: "info",
   });
 }

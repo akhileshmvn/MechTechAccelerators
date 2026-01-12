@@ -8,6 +8,12 @@ on:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
+      API_GATEWAY_NAME: ${{ secrets.API_GATEWAY_NAME }}
+      API_STAGE: ${{ secrets.API_STAGE }}
 
     steps:
       # Step 1: Get your code
@@ -28,8 +34,6 @@ jobs:
       - name: Push database schema
         if: ${{ env.DATABASE_URL != '' }}
         run: npm run db:push
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       # Step 4: Build Vite project
       - name: Build project
@@ -46,3 +50,81 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           SOURCE_DIR: dist/public
+
+      # Step 6: Deploy API to Lambda (requires LAMBDA_FUNCTION_NAME)
+      - name: Package Lambda
+        if: ${{ env.LAMBDA_FUNCTION_NAME != '' }}
+        run: |
+          cd dist
+          zip -r lambda.zip lambda.cjs
+
+      - name: Deploy Lambda
+        if: ${{ env.LAMBDA_FUNCTION_NAME != '' }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --zip-file "fileb://dist/lambda.zip" \
+            --region "$AWS_REGION"
+
+      # Step 7: Configure API Gateway HTTP API (optional)
+      - name: Configure API Gateway
+        if: ${{ env.LAMBDA_FUNCTION_NAME != '' && env.API_GATEWAY_NAME != '' }}
+        run: |
+          set -euo pipefail
+          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_GATEWAY_NAME'].ApiId | [0]" --output text)
+          if [ "$API_ID" = "None" ]; then
+            API_ID=$(aws apigatewayv2 create-api \
+              --name "$API_GATEWAY_NAME" \
+              --protocol-type HTTP \
+              --query ApiId \
+              --output text)
+          fi
+
+          LAMBDA_ARN=$(aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --query "Configuration.FunctionArn" --output text)
+          INTEGRATION_ID=$(aws apigatewayv2 get-integrations --api-id "$API_ID" --query "Items[?IntegrationUri=='$LAMBDA_ARN'].IntegrationId | [0]" --output text)
+          if [ "$INTEGRATION_ID" = "None" ]; then
+            INTEGRATION_ID=$(aws apigatewayv2 create-integration \
+              --api-id "$API_ID" \
+              --integration-type AWS_PROXY \
+              --integration-uri "$LAMBDA_ARN" \
+              --payload-format-version "2.0" \
+              --query IntegrationId \
+              --output text)
+          fi
+
+          ROUTE_KEY="GET /api/GetCernerCredentials"
+          ROUTE_ID=$(aws apigatewayv2 get-routes --api-id "$API_ID" --query "Items[?RouteKey=='$ROUTE_KEY'].RouteId | [0]" --output text)
+          if [ "$ROUTE_ID" = "None" ]; then
+            aws apigatewayv2 create-route \
+              --api-id "$API_ID" \
+              --route-key "$ROUTE_KEY" \
+              --target "integrations/$INTEGRATION_ID" >/dev/null
+          else
+            aws apigatewayv2 update-route \
+              --api-id "$API_ID" \
+              --route-id "$ROUTE_ID" \
+              --target "integrations/$INTEGRATION_ID" >/dev/null
+          fi
+
+          if [ -z "${API_STAGE:-}" ]; then
+            API_STAGE="prod"
+          fi
+          STAGE_EXISTS=$(aws apigatewayv2 get-stages --api-id "$API_ID" --query "Items[?StageName=='$API_STAGE'].StageName | [0]" --output text)
+          if [ "$STAGE_EXISTS" = "None" ]; then
+            aws apigatewayv2 create-stage \
+              --api-id "$API_ID" \
+              --stage-name "$API_STAGE" \
+              --auto-deploy >/dev/null
+          fi
+
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          PERM_ARN="arn:aws:execute-api:$AWS_REGION:$ACCOUNT_ID:$API_ID/*/GET/api/GetCernerCredentials"
+          aws lambda add-permission \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --statement-id "apigw-get-cerner-credentials" \
+            --action "lambda:InvokeFunction" \
+            --principal apigateway.amazonaws.com \
+            --source-arn "$PERM_ARN" >/dev/null || true
+
+          API_ENDPOINT=$(aws apigatewayv2 get-api --api-id "$API_ID" --query "ApiEndpoint" --output text)
+          echo "API endpoint: $API_ENDPOINT/$API_STAGE/api/GetCernerCredentials"
