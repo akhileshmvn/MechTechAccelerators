@@ -74,6 +74,14 @@ jobs:
             --zip-file "fileb://dist/lambda.zip" \
             --region "$AWS_REGION"
 
+      - name: Configure Lambda environment
+        if: ${{ env.LAMBDA_FUNCTION_NAME != '' && env.DATABASE_URL != '' }}
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --environment "Variables={DATABASE_URL=$DATABASE_URL}" \
+            --region "$AWS_REGION"
+
       # Step 7: Configure API Gateway HTTP API (optional)
       - name: Configure API Gateway
         if: ${{ env.LAMBDA_FUNCTION_NAME != '' && env.API_GATEWAY_NAME != '' }}
