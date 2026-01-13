@@ -21,6 +21,14 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+app.use((req, _res, next) => {
+  const stage = process.env.API_STAGE;
+  if (stage && req.url.startsWith(`/${stage}/`)) {
+    req.url = req.url.slice(stage.length + 1) || "/";
+  }
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
