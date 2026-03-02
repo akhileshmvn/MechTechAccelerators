@@ -56,6 +56,13 @@ const PATIENT_ONLY_HEADER = [
   "RCEncounterAdded"
 ];
 
+// Environment mapping: B=Build, R=Release, C=Cert
+const ENVIRONMENT_PREFIX: Record<string, string> = {
+  'Build': 'B',
+  'Release': 'R',
+  'Cert': 'C'
+};
+
 function isValidStartName(name: string) {
   if (!name || name.length < 5) return false;
   const suffix = name.slice(-4);
@@ -73,6 +80,8 @@ function decodeCounter(s: string) {
   }
   return v;
 }
+
+export { decodeCounter };
 
 function encodeCounter(n: number) {
   let out = Array(4).fill('A');
@@ -97,6 +106,42 @@ function generateNames(startName: string, count: number) {
     if (enc === null) throw new Error("Sequence overflow after " + i + " names for start " + startName);
     const full = prefix + enc;
     list.push({ index: i + 1, last: full, first: enc });
+  }
+  return list;
+}
+
+/**
+ * Generate patient names with new convention:
+ * Last Name: EPPAT + 4-char counter (EPPATAAAA, EPPATAAAB, etc.)
+ * First Name: 1-char environment prefix + 4-char counter (BAAAA, BAAAB for Build)
+ * Environment: 'Build' -> 'B', 'Release' -> 'R', 'Cert' -> 'C', Custom -> first char of custom string
+ */
+export function generateNewConventionNames(startCounter: number, count: number, environment: 'Build' | 'Release' | 'Cert' | 'Custom', customEnvironment?: string) {
+  if (!(count > 0)) throw new Error("Count must be positive");
+  
+  let envPrefix: string;
+  
+  if (environment === 'Custom') {
+    if (!customEnvironment || customEnvironment.trim().length === 0) {
+      throw new Error("Custom environment name is required");
+    }
+    // Use first character of custom environment
+    envPrefix = customEnvironment.trim().charAt(0).toUpperCase();
+  } else {
+    if (!ENVIRONMENT_PREFIX[environment]) throw new Error(`Invalid environment. Must be one of: ${Object.keys(ENVIRONMENT_PREFIX).join(', ')}`);
+    envPrefix = ENVIRONMENT_PREFIX[environment];
+  }
+  
+  const list = [];
+  
+  for (let i = 0; i < count; i++) {
+    const counterValue = startCounter + i;
+    const enc = encodeCounter(counterValue);
+    if (enc === null) throw new Error(`Sequence overflow after ${i} names starting from counter ${startCounter}`);
+    
+    const lastName = 'EPPAT' + enc;
+    const firstName = envPrefix + enc;
+    list.push({ index: i + 1, last: lastName, first: firstName });
   }
   return list;
 }
@@ -143,27 +188,58 @@ export interface Batch {
   count: number;
 }
 
+export interface NewConventionBatch {
+  id: string;
+  startName: string;
+  count: number;
+  environment: 'Build' | 'Release' | 'Cert' | 'Custom';
+  customEnvironment?: string;
+}
+
 export interface PatientGenerationOptions {
   includeRCEncounters?: boolean;
+  useNewConvention?: boolean;
 }
 
 export async function generatePatientData(
-  batches: Batch[],
+  batches: Batch[] | NewConventionBatch[],
   fileName?: string,
   options: PatientGenerationOptions = {}
 ) {
   let all: any[] = [];
   const addressPool = await loadAddresses();
+  const useNewConvention = options.useNewConvention || false;
   
-  for (const b of batches) {
-    const names = generateNames(b.startName, b.count);
-    names.forEach((n: any) => {
-      const a = pickRandomAddress(addressPool);
-      n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };
-      n.gender = randomGender();
-      n.dob = randomDOBBefore2000();
-      all.push(n);
-    });
+  if (useNewConvention) {
+    // Handle new convention batches
+    for (const b of batches as NewConventionBatch[]) {
+      const startName = b.startName.toUpperCase().trim();
+      // Validate base-25 format
+      if (!startName || startName.length !== 4 || !/^[A-Z]{4}$/.test(startName)) {
+        throw new Error(`Invalid start name "${b.startName}". Must be 4 base-25 letters (A-Z excluding I, O), e.g., AAAA, AAAB`);
+      }
+      const counter = decodeCounter(startName);
+      const names = generateNewConventionNames(counter, b.count, b.environment, b.customEnvironment);
+      names.forEach((n: any) => {
+        const a = pickRandomAddress(addressPool);
+        n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };
+        n.gender = randomGender();
+        n.dob = randomDOBBefore2000();
+        all.push(n);
+      });
+    }
+  } else {
+    // Handle legacy batches
+    for (const b of batches as Batch[]) {
+      const names = generateNames(b.startName, b.count);
+      names.forEach((n: any) => {
+        const a = pickRandomAddress(addressPool);
+        n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };
+        n.gender = randomGender();
+        n.dob = randomDOBBefore2000();
+        all.push(n);
+      });
+    }
   }
 
   const includeRCEncounters = options.includeRCEncounters !== false;
