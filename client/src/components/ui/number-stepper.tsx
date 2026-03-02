@@ -39,7 +39,7 @@ export function NumberStepper({
   };
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("inline-flex items-center gap-2", className)}>
       <Button
         variant="outline"
         size="icon"
@@ -50,7 +50,7 @@ export function NumberStepper({
         <Minus className="h-4 w-4" />
       </Button>
       
-      <div className="relative flex-1 min-w-[60px]">
+      <div className="relative w-[60px] shrink-0">
         <Input
           type="number"
           value={value}

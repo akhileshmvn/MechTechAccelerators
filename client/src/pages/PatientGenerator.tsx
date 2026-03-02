@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { GlassCard, WizardHeader } from "@/components/ui/glass-card";
 import { Plus, Trash2, Download, ArrowLeft, AlertCircle } from "lucide-react";
-import { generatePatientData, Batch, generateNewConventionNames } from "@/lib/patientGenerator";
+import { generatePatientData, Batch, generateNewConventionNames, decodeCounter } from "@/lib/patientGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,10 +11,19 @@ import { useLocation } from "wouter";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+type TrackedEnvironment = 'Build' | 'Release' | 'Cert';
+type SequenceMap = Record<TrackedEnvironment, string>;
+const defaultSequenceMap: SequenceMap = {
+  Build: "AAAA",
+  Release: "AAAA",
+  Cert: "AAAA",
+};
+
 export default function PatientGenerator() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [namingMode, setNamingMode] = useState<'legacy' | 'new'>('new');
+  const [sequenceDefaults, setSequenceDefaults] = useState<SequenceMap>(defaultSequenceMap);
   
   const createBatchId = () => {
     // Some hosting setups (e.g. non-HTTPS S3 websites) block crypto.randomUUID
@@ -34,8 +43,8 @@ export default function PatientGenerator() {
   ]);
   
   // New mode state
-  const [newBatches, setNewBatches] = useState<Array<{ id: string; startCounter: number; count: number; environment: 'Build' | 'Release' | 'Cert' }>>(() => [
-    { id: createBatchId(), startCounter: 0, count: 10, environment: 'Cert' }
+  const [newBatches, setNewBatches] = useState<Array<{ id: string; startName: string; count: number; environment: 'Build' | 'Release' | 'Cert' | 'Custom'; customEnvironment?: string }>>(() => [
+    { id: createBatchId(), startName: 'AAAA', count: 10, environment: 'Cert' }
   ]);
   
   const [fileName, setFileName] = useState("");
@@ -43,12 +52,58 @@ export default function PatientGenerator() {
   const [previewData, setPreviewData] = useState<Array<{ last: string; first: string }>>([]);
   const [showPreview, setShowPreview] = useState(false);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSequenceDefaults = async () => {
+      try {
+        const response = await fetch("/api/patient-name-sequence", {
+          credentials: "include",
+        });
+        if (!response.ok) return;
+
+        const data = await response.json() as Partial<SequenceMap>;
+        const nextDefaults: SequenceMap = {
+          Build: data.Build || "AAAA",
+          Release: data.Release || "AAAA",
+          Cert: data.Cert || "AAAA",
+        };
+
+        if (!isMounted) return;
+        setSequenceDefaults(nextDefaults);
+        setNewBatches((current) =>
+          current.map((batch, index) => {
+            if (index !== 0) return batch;
+            if (batch.environment === "Custom") return batch;
+            return {
+              ...batch,
+              startName: nextDefaults[batch.environment],
+            };
+          }),
+        );
+      } catch {
+        // keep defaults when sequence API is unavailable
+      }
+    };
+
+    loadSequenceDefaults();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const generatePreview = () => {
     try {
       if (namingMode === 'new' && newBatches.length > 0) {
         const preview: Array<{ last: string; first: string }> = [];
         for (const b of newBatches) {
-          const names = generateNewConventionNames(b.startCounter, Math.min(b.count, 10), b.environment);
+          const startName = b.startName.toUpperCase().trim();
+          // Validate base-25 format
+          if (!startName || startName.length !== 4 || !/^[A-Z]{4}$/.test(startName)) {
+            throw new Error(`Invalid start name "${b.startName}". Must be 4 base-25 letters (A-Z excluding I, O), e.g., AAAA, AAAB`);
+          }
+          const counter = decodeCounter(startName);
+          const names = generateNewConventionNames(counter, Math.min(b.count, 10), b.environment, b.customEnvironment);
           preview.push(...names);
         }
         setPreviewData(preview.slice(0, 20)); // Show max 20 names
@@ -77,7 +132,16 @@ export default function PatientGenerator() {
     if (namingMode === 'legacy') {
       setBatches([...batches, { id: createBatchId(), startName: "", count: 10 }]);
     } else {
-      setNewBatches([...newBatches, { id: createBatchId(), startCounter: 0, count: 10, environment: 'Cert' }]);
+      setNewBatches([
+        ...newBatches,
+        {
+          id: createBatchId(),
+          startName: sequenceDefaults.Cert,
+          count: 10,
+          environment: 'Cert',
+          customEnvironment: '',
+        },
+      ]);
     }
   };
 
@@ -101,6 +165,25 @@ export default function PatientGenerator() {
     }
   };
 
+  const updateNewBatchEnvironment = (
+    id: string,
+    environment: 'Build' | 'Release' | 'Cert' | 'Custom',
+  ) => {
+    setNewBatches((current) =>
+      current.map((batch) => {
+        if (batch.id !== id) return batch;
+        if (environment === 'Custom') {
+          return { ...batch, environment };
+        }
+        return {
+          ...batch,
+          environment,
+          startName: sequenceDefaults[environment],
+        };
+      }),
+    );
+  };
+
   const handleGenerate = async () => {
     try {
       if (namingMode === 'legacy') {
@@ -113,24 +196,70 @@ export default function PatientGenerator() {
         await generatePatientData(batches, fileName, { includeRCEncounters });
       } else {
         // Generate new convention batches
-        const expandedBatches: Batch[] = [];
         for (const b of newBatches) {
-          // Generate names for this batch
-          const names = generateNewConventionNames(b.startCounter, b.count, b.environment);
-          // Create a synthetic batch with all names
-          let batchIndex = 0;
-          for (const n of names) {
-            expandedBatches.push({
-              id: `${b.id}-${batchIndex}`,
-              startName: `${n.last}${n.first}`, // This won't be used, but field is required
-              count: 1
-            });
-            batchIndex++;
+          const startName = b.startName.toUpperCase().trim();
+          // Validate base-25 format
+          if (!startName || startName.length !== 4 || !/^[A-Z]{4}$/.test(startName)) {
+            throw new Error(`Invalid start name "${b.startName}". Must be 4 base-25 letters (A-Z excluding I, O), e.g., AAAA, AAAB`);
+          }
+          // Validate custom environment if selected
+          if (b.environment === 'Custom') {
+            if (!b.customEnvironment || b.customEnvironment.trim().length === 0) {
+              throw new Error(`Custom environment name is required for batch starting with ${b.startName}`);
+            }
           }
         }
-        // For now, use legacy generation - we'll handle the names mapping in the generation function
-        // Actually, let's refactor to pass the new names directly
         await generatePatientData(newBatches as any, fileName, { includeRCEncounters, useNewConvention: true });
+
+        const trackedBatches = newBatches
+          .filter((b) => b.environment !== 'Custom')
+          .map((b) => ({
+            environment: b.environment,
+            startName: b.startName,
+            count: b.count,
+          }));
+
+        if (trackedBatches.length > 0) {
+          try {
+            const response = await fetch("/api/patient-name-sequence/advance", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ batches: trackedBatches }),
+            });
+
+            if (response.ok) {
+              const updated = await response.json() as Partial<SequenceMap>;
+              const updatedDefaults: SequenceMap = {
+                Build: updated.Build || sequenceDefaults.Build,
+                Release: updated.Release || sequenceDefaults.Release,
+                Cert: updated.Cert || sequenceDefaults.Cert,
+              };
+              setSequenceDefaults(updatedDefaults);
+
+              // Keep first visible row aligned to the latest default
+              setNewBatches((current) =>
+                current.map((batch, index) => {
+                  if (index !== 0) return batch;
+                  if (batch.environment === 'Custom') return batch;
+                  return { ...batch, startName: updatedDefaults[batch.environment] };
+                }),
+              );
+            } else {
+              toast({
+                title: "Generated, but sequence not updated",
+                description: "Patient file was generated, but next start names could not be persisted.",
+                variant: "destructive",
+              });
+            }
+          } catch {
+            toast({
+              title: "Generated, but sequence not updated",
+              description: "Patient file was generated, but next start names could not be persisted.",
+              variant: "destructive",
+            });
+          }
+        }
       }
       
       toast({
@@ -201,9 +330,10 @@ export default function PatientGenerator() {
           {/* New Convention Mode */}
           {namingMode === 'new' && (
             <>
-              <div className="grid grid-cols-[1fr_140px_120px_60px] gap-4 px-4 text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                <div>Start Counter</div>
-                <div className="text-center">Environment</div>
+              <div className="grid grid-cols-[50px_1.5fr_170px_156px_52px] gap-3 px-4 text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+                <div></div>
+                <div>Start Name (Base-25)</div>
+                <div>Environment</div>
                 <div className="text-center">Count</div>
                 <div></div>
               </div>
@@ -217,29 +347,48 @@ export default function PatientGenerator() {
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="grid grid-cols-[1fr_140px_120px_60px] gap-4 items-center p-4 bg-white/5 border border-white/5 rounded-xl hover:border-white/10 transition-colors"
+                      className="grid grid-cols-[50px_1.5fr_170px_156px_52px] gap-3 items-center p-3 bg-white/5 border border-white/5 rounded-xl hover:border-white/10 transition-colors"
                     >
-                      <div className="flex items-center gap-2">
-                        <Input 
-                          type="number"
-                          value={batch.startCounter}
-                          onChange={(e) => updateBatch(batch.id, 'startCounter', parseInt(e.target.value) || 0)}
-                          placeholder="0"
-                          className="bg-black/20 border-white/10 font-mono"
-                        />
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">EPPAT[...]</span>
-                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap font-mono text-center">EPPAT</span>
+                      <Input 
+                        value={batch.startName}
+                        onChange={(e) => updateBatch(batch.id, 'startName', e.target.value.toUpperCase())}
+                        placeholder="AAAA"
+                        maxLength={4}
+                        className="bg-black/20 border-white/10 font-mono tracking-widest uppercase placeholder:uppercase text-center"
+                      />
                       
-                      <Select value={batch.environment} onValueChange={(val) => updateBatch(batch.id, 'environment', val)}>
-                        <SelectTrigger className="bg-black/20 border-white/10">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Build">Build (B)</SelectItem>
-                          <SelectItem value="Release">Release (R)</SelectItem>
-                          <SelectItem value="Cert">Cert (C)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={batch.environment}
+                          onValueChange={(val) =>
+                            updateNewBatchEnvironment(
+                              batch.id,
+                              val as 'Build' | 'Release' | 'Cert' | 'Custom',
+                            )
+                          }
+                        >
+                          <SelectTrigger className="bg-black/20 border-white/10 h-9 w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Build">Build (B)</SelectItem>
+                            <SelectItem value="Release">Release (R)</SelectItem>
+                            <SelectItem value="Cert">Cert (C)</SelectItem>
+                            <SelectItem value="Custom">Custom</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        {batch.environment === 'Custom' && (
+                          <Input
+                            value={batch.customEnvironment || ''}
+                            onChange={(e) => updateBatch(batch.id, 'customEnvironment', e.target.value.toUpperCase())}
+                            placeholder="QA"
+                            maxLength={3}
+                            className="bg-amber-500/10 border-amber-500/30 font-mono tracking-widest uppercase placeholder:uppercase text-center h-8 w-12"
+                          />
+                        )}
+                      </div>
                       
                       <div className="flex justify-center">
                         <NumberStepper 
@@ -262,8 +411,6 @@ export default function PatientGenerator() {
                   ))}
                 </AnimatePresence>
               </div>
-            </>
-          )}
             </>
           )}
 
@@ -315,6 +462,8 @@ export default function PatientGenerator() {
               ))}
             </AnimatePresence>
           </div>
+            </>
+          )}
 
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <Switch checked={includeRCEncounters} onCheckedChange={setIncludeRCEncounters} />
@@ -384,23 +533,25 @@ export default function PatientGenerator() {
                 </button>
               </div>
               
-              <div className="max-h-[300px] overflow-y-auto rounded border border-blue-500/20 bg-black/30 custom-scrollbar">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-blue-600/20">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-blue-300">Last Name</th>
-                      <th className="px-4 py-2 text-left font-medium text-blue-300">First Name</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-blue-500/10">
-                    {previewData.map((patient, idx) => (
-                      <tr key={idx} className="hover:bg-blue-500/10 transition-colors">
-                        <td className="px-4 py-2 font-mono text-emerald-300">{patient.last}</td>
-                        <td className="px-4 py-2 font-mono text-blue-300">{patient.first}</td>
+              <div className="rounded border border-blue-500/20 bg-black/30 overflow-hidden">
+                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-30 bg-blue-950/80 border-b-2 border-blue-500/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-blue-100">Last Name</th>
+                        <th className="px-4 py-3 text-left font-semibold text-blue-100">First Name</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-blue-500/20 bg-black/20">
+                      {previewData.map((patient, idx) => (
+                        <tr key={idx} className={`transition-colors ${idx % 2 === 0 ? 'bg-blue-950/20' : 'bg-black/40'} hover:bg-blue-500/20`}>
+                          <td className="px-4 py-2 font-mono text-emerald-300">{patient.last}</td>
+                          <td className="px-4 py-2 font-mono text-blue-300">{patient.first}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               
               <p className="mt-3 text-xs text-muted-foreground flex items-center gap-2">

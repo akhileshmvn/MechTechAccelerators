@@ -81,6 +81,8 @@ function decodeCounter(s: string) {
   return v;
 }
 
+export { decodeCounter };
+
 function encodeCounter(n: number) {
   let out = Array(4).fill('A');
   for (let i = 3; i >= 0; i--) {
@@ -112,13 +114,24 @@ function generateNames(startName: string, count: number) {
  * Generate patient names with new convention:
  * Last Name: EPPAT + 4-char counter (EPPATAAAA, EPPATAAAB, etc.)
  * First Name: 1-char environment prefix + 4-char counter (BAAAA, BAAAB for Build)
- * Environment: 'Build' -> 'B', 'Release' -> 'R', 'Cert' -> 'C'
+ * Environment: 'Build' -> 'B', 'Release' -> 'R', 'Cert' -> 'C', Custom -> first char of custom string
  */
-export function generateNewConventionNames(startCounter: number, count: number, environment: keyof typeof ENVIRONMENT_PREFIX) {
+export function generateNewConventionNames(startCounter: number, count: number, environment: 'Build' | 'Release' | 'Cert' | 'Custom', customEnvironment?: string) {
   if (!(count > 0)) throw new Error("Count must be positive");
-  if (!ENVIRONMENT_PREFIX[environment]) throw new Error(`Invalid environment. Must be one of: ${Object.keys(ENVIRONMENT_PREFIX).join(', ')}`);
   
-  const envPrefix = ENVIRONMENT_PREFIX[environment];
+  let envPrefix: string;
+  
+  if (environment === 'Custom') {
+    if (!customEnvironment || customEnvironment.trim().length === 0) {
+      throw new Error("Custom environment name is required");
+    }
+    // Use first character of custom environment
+    envPrefix = customEnvironment.trim().charAt(0).toUpperCase();
+  } else {
+    if (!ENVIRONMENT_PREFIX[environment]) throw new Error(`Invalid environment. Must be one of: ${Object.keys(ENVIRONMENT_PREFIX).join(', ')}`);
+    envPrefix = ENVIRONMENT_PREFIX[environment];
+  }
+  
   const list = [];
   
   for (let i = 0; i < count; i++) {
@@ -177,9 +190,10 @@ export interface Batch {
 
 export interface NewConventionBatch {
   id: string;
-  startCounter: number;
+  startName: string;
   count: number;
-  environment: keyof typeof ENVIRONMENT_PREFIX;
+  environment: 'Build' | 'Release' | 'Cert' | 'Custom';
+  customEnvironment?: string;
 }
 
 export interface PatientGenerationOptions {
@@ -199,7 +213,13 @@ export async function generatePatientData(
   if (useNewConvention) {
     // Handle new convention batches
     for (const b of batches as NewConventionBatch[]) {
-      const names = generateNewConventionNames(b.startCounter, b.count, b.environment);
+      const startName = b.startName.toUpperCase().trim();
+      // Validate base-25 format
+      if (!startName || startName.length !== 4 || !/^[A-Z]{4}$/.test(startName)) {
+        throw new Error(`Invalid start name "${b.startName}". Must be 4 base-25 letters (A-Z excluding I, O), e.g., AAAA, AAAB`);
+      }
+      const counter = decodeCounter(startName);
+      const names = generateNewConventionNames(counter, b.count, b.environment, b.customEnvironment);
       names.forEach((n: any) => {
         const a = pickRandomAddress(addressPool);
         n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };

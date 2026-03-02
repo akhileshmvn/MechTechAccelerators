@@ -1,6 +1,6 @@
 import { type Request, Response, NextFunction } from "express";
 import { serveStatic } from "./static";
-import { app, ensureRoutes, httpServer } from "./app";
+import { app, ensureRoutes, httpServer, log } from "./app";
 
 (async () => {
   await ensureRoutes();
