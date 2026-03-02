@@ -56,6 +56,13 @@ const PATIENT_ONLY_HEADER = [
   "RCEncounterAdded"
 ];
 
+// Environment mapping: B=Build, R=Release, C=Cert
+const ENVIRONMENT_PREFIX: Record<string, string> = {
+  'Build': 'B',
+  'Release': 'R',
+  'Cert': 'C'
+};
+
 function isValidStartName(name: string) {
   if (!name || name.length < 5) return false;
   const suffix = name.slice(-4);
@@ -97,6 +104,31 @@ function generateNames(startName: string, count: number) {
     if (enc === null) throw new Error("Sequence overflow after " + i + " names for start " + startName);
     const full = prefix + enc;
     list.push({ index: i + 1, last: full, first: enc });
+  }
+  return list;
+}
+
+/**
+ * Generate patient names with new convention:
+ * Last Name: EPPAT + 4-char counter (EPPATAAAA, EPPATAAAB, etc.)
+ * First Name: 1-char environment prefix + 4-char counter (BAAAA, BAAAB for Build)
+ * Environment: 'Build' -> 'B', 'Release' -> 'R', 'Cert' -> 'C'
+ */
+export function generateNewConventionNames(startCounter: number, count: number, environment: keyof typeof ENVIRONMENT_PREFIX) {
+  if (!(count > 0)) throw new Error("Count must be positive");
+  if (!ENVIRONMENT_PREFIX[environment]) throw new Error(`Invalid environment. Must be one of: ${Object.keys(ENVIRONMENT_PREFIX).join(', ')}`);
+  
+  const envPrefix = ENVIRONMENT_PREFIX[environment];
+  const list = [];
+  
+  for (let i = 0; i < count; i++) {
+    const counterValue = startCounter + i;
+    const enc = encodeCounter(counterValue);
+    if (enc === null) throw new Error(`Sequence overflow after ${i} names starting from counter ${startCounter}`);
+    
+    const lastName = 'EPPAT' + enc;
+    const firstName = envPrefix + enc;
+    list.push({ index: i + 1, last: lastName, first: firstName });
   }
   return list;
 }
@@ -143,27 +175,51 @@ export interface Batch {
   count: number;
 }
 
+export interface NewConventionBatch {
+  id: string;
+  startCounter: number;
+  count: number;
+  environment: keyof typeof ENVIRONMENT_PREFIX;
+}
+
 export interface PatientGenerationOptions {
   includeRCEncounters?: boolean;
+  useNewConvention?: boolean;
 }
 
 export async function generatePatientData(
-  batches: Batch[],
+  batches: Batch[] | NewConventionBatch[],
   fileName?: string,
   options: PatientGenerationOptions = {}
 ) {
   let all: any[] = [];
   const addressPool = await loadAddresses();
+  const useNewConvention = options.useNewConvention || false;
   
-  for (const b of batches) {
-    const names = generateNames(b.startName, b.count);
-    names.forEach((n: any) => {
-      const a = pickRandomAddress(addressPool);
-      n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };
-      n.gender = randomGender();
-      n.dob = randomDOBBefore2000();
-      all.push(n);
-    });
+  if (useNewConvention) {
+    // Handle new convention batches
+    for (const b of batches as NewConventionBatch[]) {
+      const names = generateNewConventionNames(b.startCounter, b.count, b.environment);
+      names.forEach((n: any) => {
+        const a = pickRandomAddress(addressPool);
+        n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };
+        n.gender = randomGender();
+        n.dob = randomDOBBefore2000();
+        all.push(n);
+      });
+    }
+  } else {
+    // Handle legacy batches
+    for (const b of batches as Batch[]) {
+      const names = generateNames(b.startName, b.count);
+      names.forEach((n: any) => {
+        const a = pickRandomAddress(addressPool);
+        n.addr = { Address: a.Address, City: a.City, State: a.State, Zip: String(a.Zip || '').padStart(5, '0') };
+        n.gender = randomGender();
+        n.dob = randomDOBBefore2000();
+        all.push(n);
+      });
+    }
   }
 
   const includeRCEncounters = options.includeRCEncounters !== false;
