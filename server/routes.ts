@@ -26,6 +26,7 @@ const inMemorySequence: Record<TrackedEnvironment, string> = {
   ...defaultSequence,
 };
 let sequenceInitialized = false;
+let dbSequenceInitialized = false;
 
 const isTrackedEnvironment = (value: string): value is TrackedEnvironment =>
   (TRACKED_ENVIRONMENTS as readonly string[]).includes(value);
@@ -54,8 +55,6 @@ const encodeBase25 = (value: number) => {
 };
 
 const loadSequenceFromFile = async () => {
-  if (sequenceInitialized) return;
-
   try {
     const raw = await readFile(sequenceFilePath, "utf-8");
     const parsed = JSON.parse(raw) as Partial<Record<TrackedEnvironment, string>>;
@@ -67,8 +66,6 @@ const loadSequenceFromFile = async () => {
     }
   } catch {
     // Keep defaults if file is missing/invalid; we'll write on first update.
-  } finally {
-    sequenceInitialized = true;
   }
 };
 
@@ -79,6 +76,100 @@ const saveSequenceToFile = async () => {
     JSON.stringify(inMemorySequence, null, 2),
     "utf-8",
   );
+};
+
+const isDatabaseConfigured = () => Boolean(process.env.DATABASE_URL);
+
+const ensureSequenceTable = async () => {
+  if (dbSequenceInitialized || !isDatabaseConfigured()) return;
+  const db = getDb();
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS patient_name_sequence (
+      environment TEXT PRIMARY KEY,
+      start_name TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  for (const environment of TRACKED_ENVIRONMENTS) {
+    await db.execute(sql`
+      INSERT INTO patient_name_sequence (environment, start_name)
+      VALUES (${environment}, ${defaultSequence[environment]})
+      ON CONFLICT (environment) DO NOTHING
+    `);
+  }
+
+  dbSequenceInitialized = true;
+};
+
+const loadSequenceFromDatabase = async () => {
+  if (!isDatabaseConfigured()) return false;
+
+  try {
+    await ensureSequenceTable();
+    const db = getDb();
+    const result = await db.execute(sql`
+      SELECT environment, start_name
+      FROM patient_name_sequence
+    `);
+
+    const rows = ((result as any)?.rows ?? []) as Array<{
+      environment: string;
+      start_name: string;
+    }>;
+
+    for (const row of rows) {
+      const environment = String(row.environment || "");
+      const startName = String(row.start_name || "").toUpperCase().trim();
+      if (isTrackedEnvironment(environment) && isValidBase25Name(startName)) {
+        inMemorySequence[environment] = startName;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Failed to load patient name sequence from database", err);
+    return false;
+  }
+};
+
+const saveSequenceToDatabase = async () => {
+  if (!isDatabaseConfigured()) return false;
+
+  try {
+    await ensureSequenceTable();
+    const db = getDb();
+    for (const environment of TRACKED_ENVIRONMENTS) {
+      await db.execute(sql`
+        INSERT INTO patient_name_sequence (environment, start_name, updated_at)
+        VALUES (${environment}, ${inMemorySequence[environment]}, NOW())
+        ON CONFLICT (environment)
+        DO UPDATE SET
+          start_name = EXCLUDED.start_name,
+          updated_at = NOW()
+      `);
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to persist patient name sequence to database", err);
+    return false;
+  }
+};
+
+const loadSequence = async () => {
+  if (sequenceInitialized) return;
+
+  const loadedFromDb = await loadSequenceFromDatabase();
+  if (!loadedFromDb) {
+    await loadSequenceFromFile();
+  }
+  sequenceInitialized = true;
+};
+
+const saveSequence = async () => {
+  const savedToDb = await saveSequenceToDatabase();
+  if (savedToDb) return;
+  await saveSequenceToFile();
 };
 
 export async function registerRoutes(
@@ -186,12 +277,12 @@ export async function registerRoutes(
   });
 
   app.get("/api/patient-name-sequence", async (_req, res) => {
-    await loadSequenceFromFile();
+    await loadSequence();
     return res.status(200).json(inMemorySequence);
   });
 
   app.post("/api/patient-name-sequence/advance", async (req, res) => {
-    await loadSequenceFromFile();
+    await loadSequence();
 
     const payload = req.body as {
       batches?: Array<{ environment: string; startName: string; count: number }>;
@@ -242,7 +333,7 @@ export async function registerRoutes(
     }
 
     try {
-      await saveSequenceToFile();
+      await saveSequence();
     } catch (err) {
       console.error("Failed to persist patient name sequence file", err);
       return res.status(500).json({
