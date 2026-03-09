@@ -10,7 +10,11 @@ export const getDb = () => {
   if (!connectionString) {
     throw new Error("DATABASE_URL is required for database access.");
   }
-  pool = new Pool({ connectionString });
+  pool = new Pool({
+    connectionString,
+    // Prevent long hangs when DB network access is misconfigured.
+    connectionTimeoutMillis: 5000,
+  });
   dbInstance = drizzle(pool);
   return dbInstance;
 };

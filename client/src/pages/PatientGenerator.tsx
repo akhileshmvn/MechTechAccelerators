@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { withApiBase } from "@/lib/queryClient";
 
 type TrackedEnvironment = 'Build' | 'Release' | 'Cert';
 type SequenceMap = Record<TrackedEnvironment, string>;
@@ -44,7 +45,7 @@ export default function PatientGenerator() {
   
   // New mode state
   const [newBatches, setNewBatches] = useState<Array<{ id: string; startName: string; count: number; environment: 'Build' | 'Release' | 'Cert' | 'Custom'; customEnvironment?: string }>>(() => [
-    { id: createBatchId(), startName: 'AAAA', count: 10, environment: 'Cert' }
+    { id: createBatchId(), startName: 'AAAA', count: 10, environment: 'Build' }
   ]);
   
   const [fileName, setFileName] = useState("");
@@ -57,7 +58,7 @@ export default function PatientGenerator() {
 
     const loadSequenceDefaults = async () => {
       try {
-        const response = await fetch("/api/patient-name-sequence", {
+        const response = await fetch(withApiBase("/api/patient-name-sequence"), {
           credentials: "include",
         });
         if (!response.ok) return;
@@ -136,9 +137,9 @@ export default function PatientGenerator() {
         ...newBatches,
         {
           id: createBatchId(),
-          startName: sequenceDefaults.Cert,
+          startName: sequenceDefaults.Build,
           count: 10,
-          environment: 'Cert',
+          environment: 'Build',
           customEnvironment: '',
         },
       ]);
@@ -221,7 +222,7 @@ export default function PatientGenerator() {
 
         if (trackedBatches.length > 0) {
           try {
-            const response = await fetch("/api/patient-name-sequence/advance", {
+            const response = await fetch(withApiBase("/api/patient-name-sequence/advance"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",

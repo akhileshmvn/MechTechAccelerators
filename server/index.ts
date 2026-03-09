@@ -10,7 +10,8 @@ import { app, ensureRoutes, httpServer, log } from "./app";
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    // Do not rethrow: rethrowing crashes the process and causes 502s behind nginx.
+    console.error("Unhandled application error", err);
   });
 
   // importantly only setup vite in development and after
