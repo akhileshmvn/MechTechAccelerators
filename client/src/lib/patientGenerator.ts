@@ -2,8 +2,8 @@ import ExcelJS from 'exceljs';
 import { saveFile } from './file-utils';
 import { loadAddresses, AddressRecord } from '@/lib/addressData';
 
-const LETTERS = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
-const L2I = Object.fromEntries([...LETTERS].map((c, i) => [c, i]));
+const LETTERS = "ABCDEFGHJKLMNOPQRSTUVWXYZ".split("");
+const L2I = Object.fromEntries(LETTERS.map((c, i) => [c, i]));
 
 const FULL_HEADER = [
   "Index",
@@ -66,7 +66,7 @@ const ENVIRONMENT_PREFIX: Record<string, string> = {
 function isValidStartName(name: string) {
   if (!name || name.length < 5) return false;
   const suffix = name.slice(-4);
-  return /^[A-Z]{4}$/.test(suffix) && [...suffix].every(ch => ch in L2I);
+  return /^[A-Z]{4}$/.test(suffix) && suffix.split("").every((ch) => ch in L2I);
 }
 
 function splitPrefix(name: string) {
@@ -75,8 +75,9 @@ function splitPrefix(name: string) {
 
 function decodeCounter(s: string) {
   let v = 0;
-  for (const ch of s) {
-    v = v * 25 + L2I[ch];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    v = v * 25 + (L2I as Record<string, number>)[ch];
   }
   return v;
 }

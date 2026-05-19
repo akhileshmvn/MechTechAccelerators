@@ -76,10 +76,8 @@ export default function PatientGenerator() {
           current.map((batch, index) => {
             if (index !== 0) return batch;
             if (batch.environment === "Custom") return batch;
-            return {
-              ...batch,
-              startName: nextDefaults[batch.environment],
-            };
+            const wasDefault = batch.startName === "" || batch.startName === defaultSequenceMap[batch.environment];
+            return wasDefault ? { ...batch, startName: nextDefaults[batch.environment] } : batch;
           }),
         );
       } catch {
@@ -176,11 +174,10 @@ export default function PatientGenerator() {
         if (environment === 'Custom') {
           return { ...batch, environment };
         }
-        return {
-          ...batch,
-          environment,
-          startName: sequenceDefaults[environment],
-        };
+        const wasDefault = batch.startName === "" || batch.startName === sequenceDefaults[batch.environment];
+        return wasDefault
+          ? { ...batch, environment, startName: sequenceDefaults[environment] }
+          : { ...batch, environment };
       }),
     );
   };
@@ -238,12 +235,13 @@ export default function PatientGenerator() {
               };
               setSequenceDefaults(updatedDefaults);
 
-              // Keep first visible row aligned to the latest default
+              // Keep first visible row aligned to the latest default only if it was previously the default
               setNewBatches((current) =>
                 current.map((batch, index) => {
                   if (index !== 0) return batch;
                   if (batch.environment === 'Custom') return batch;
-                  return { ...batch, startName: updatedDefaults[batch.environment] };
+                  const wasDefault = batch.startName === sequenceDefaults[batch.environment];
+                  return wasDefault ? { ...batch, startName: updatedDefaults[batch.environment] } : batch;
                 }),
               );
             } else {
