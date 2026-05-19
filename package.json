@@ -9,6 +9,7 @@
     "build": "tsx script/build.ts",
     "start": "node dist/index.cjs",
     "check": "tsc",
+    "test:sequence": "tsx server/__tests__/patient-sequence.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
