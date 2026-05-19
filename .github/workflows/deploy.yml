@@ -3,7 +3,11 @@ name: Build and Deploy to S3
 on:
   push:
     branches:
-      - main   # runs whenever you push to main branch
+      - main
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   build-deploy:
@@ -12,42 +16,45 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      # Step 1: Get your code
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # Step 2: Setup Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
-      # Step 2.5: Configure AWS credentials
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Verify AWS_ROLE_TO_ASSUME secret exists
+        env:
+          ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        run: |
+          if [ -z "$ROLE_TO_ASSUME" ]; then
+            echo "ERROR: Repository secret AWS_ROLE_TO_ASSUME is not set."
+            echo "Set it to the role ARN (arn:aws:iam::123456789012:role/YourRoleName)."
+            exit 1
+          fi
+          if ! echo "$ROLE_TO_ASSUME" | grep -E '^arn:aws:iam::[0-9]{12}:role\/' >/dev/null; then
+            echo "WARNING: AWS_ROLE_TO_ASSUME doesn't look like a role ARN: $ROLE_TO_ASSUME"
+            echo "Workflow will continue, but verify the value is correct."
+          fi
+
+      - name: Configure AWS credentials (OIDC assume-role)
+        uses: aws-actions/configure-aws-credentials@v3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Step 3: Install dependencies
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      # Step 4: Build Vite project
       - name: Build project
         run: npm run build
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
 
-      # Step 5: Upload dist/ to S3
-      - name: Deploy to S3
-        uses: jakejarvis/s3-sync-action@master
+      - name: Sync S3
+        uses: aws-actions/amazon-s3-sync-action@v1
         with:
-          args: --delete
-        env:
-          AWS_S3_BUCKET: mechtechaccelerators.com
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          SOURCE_DIR: dist/public
+          source-dir: 'dist/public'
+          destination: 's3://mechtechaccelerators.com'
+          delete: true
