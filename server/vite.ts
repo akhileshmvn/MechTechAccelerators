@@ -17,7 +17,8 @@ export async function setupVite(server: Server, app: Express) {
   };
 
   // Resolve vite config if it is a function or a Promise (async config)
-  const rawConfig = typeof viteConfig === "function" ? viteConfig() : viteConfig;
+  const vc: any = viteConfig as any;
+  const rawConfig = typeof vc === "function" ? vc({ command: "serve", mode: process.env.NODE_ENV || "development" } as any) : vc;
   const resolvedConfig = await Promise.resolve(rawConfig as any);
 
   const vite = await createViteServer({

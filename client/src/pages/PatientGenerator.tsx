@@ -61,7 +61,13 @@ export default function PatientGenerator() {
         const response = await fetch(withApiBase("/api/patient-name-sequence"), {
           credentials: "include",
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          toast({
+            title: "Sequence Unavailable",
+            description: "Could not fetch saved start sequence; using local defaults.",
+          });
+          return;
+        }
 
         const data = await response.json() as Partial<SequenceMap>;
         const nextDefaults: SequenceMap = {
@@ -80,8 +86,12 @@ export default function PatientGenerator() {
             return wasDefault ? { ...batch, startName: nextDefaults[batch.environment] } : batch;
           }),
         );
-      } catch {
-        // keep defaults when sequence API is unavailable
+      } catch (err) {
+        // keep defaults when sequence API is unavailable, but notify the user non-disruptively
+        toast({
+          title: "Sequence Unavailable",
+          description: "Could not load saved patient start names; using local defaults.",
+        });
       }
     };
 
@@ -174,7 +184,10 @@ export default function PatientGenerator() {
         if (environment === 'Custom') {
           return { ...batch, environment };
         }
-        const wasDefault = batch.startName === "" || batch.startName === sequenceDefaults[batch.environment];
+        const wasDefault =
+          batch.startName === "" ||
+          (["Build", "Release", "Cert"] as const).includes(batch.environment as any) &&
+          batch.startName === (sequenceDefaults as any)[batch.environment as any];
         return wasDefault
           ? { ...batch, environment, startName: sequenceDefaults[environment] }
           : { ...batch, environment };
@@ -240,7 +253,10 @@ export default function PatientGenerator() {
                 current.map((batch, index) => {
                   if (index !== 0) return batch;
                   if (batch.environment === 'Custom') return batch;
-                  const wasDefault = batch.startName === sequenceDefaults[batch.environment];
+                  const wasDefault =
+                    batch.startName === "" ||
+                    (["Build", "Release", "Cert"] as const).includes(batch.environment as any) &&
+                    batch.startName === (sequenceDefaults as any)[batch.environment as any];
                   return wasDefault ? { ...batch, startName: updatedDefaults[batch.environment] } : batch;
                 }),
               );

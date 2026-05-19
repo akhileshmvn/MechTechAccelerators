@@ -8,7 +8,7 @@ import { metaImagesPlugin } from "./vite-plugin-meta-images";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(async () => {
+const configFn: any = async (env: any) => {
   const plugins: any[] = [react(), runtimeErrorOverlay(), tailwindcss(), metaImagesPlugin()];
 
   if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
@@ -45,4 +45,6 @@ export default defineConfig(async () => {
       },
     },
   };
-});
+};
+
+export default defineConfig(configFn);
